@@ -113,9 +113,22 @@ npm run deploy
 
 ### Sharing with Midwife/Family
 
+**Easy Sharing (Recommended):**
+1. Go to Settings tab
+2. Click "Generate Shareable Link"
+3. Copy the link and send it via text/email
+4. Recipients click the link and the app auto-configures
+5. Everyone tracks to the same Google Sheet - no setup needed!
+
+**Alternative - Share Google Sheet Only:**
 1. Share the Google Sheet link with anyone who needs access
 2. They can view real-time updates as contractions are recorded
 3. Data includes: timestamp, duration, intensity, notes
+
+**Multiple Devices:**
+- Everyone can use the app simultaneously
+- All contractions sync to the same sheet
+- Perfect for partner tracking while you focus on labor
 
 ## Technical Details
 

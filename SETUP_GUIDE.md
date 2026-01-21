@@ -232,6 +232,14 @@ Love,
    - Toggle between light/dark mode
    - Verify preference persists on reload
 
+7. **Shareable Link Test**
+   - Go to Settings tab
+   - Click "Generate Shareable Link"
+   - Copy the link
+   - Open it in an incognito/private window
+   - Verify app auto-configures with "App automatically configured!" message
+   - Try adding a contraction and verify it syncs
+
 ## Troubleshooting Common Issues
 
 ### "Sync Failed" Error
@@ -369,11 +377,20 @@ If you want to customize the Google Sheet:
 
 ### Multiple Devices
 
-To use on multiple devices:
+**Easy Method (Recommended):**
+1. Configure the app on your device
+2. Go to Settings > "Generate Shareable Link"
+3. Send the link to others via text/email
+4. They click the link and it auto-configures
+5. Everyone syncs to the same sheet!
+
+**Manual Method:**
 1. Open app on each device
 2. Enter same Google Sheets configuration
 3. Both devices will sync to same sheet
 4. Data merges automatically
+
+**Security Note:** The shareable link contains your API key encoded in the URL. The link clears from the browser after configuration, but only share with trusted people (partner, midwife, doula).
 
 ### API Key Security
 

@@ -58,12 +58,14 @@ npm run deploy
 4. Test connection
 5. Save settings
 
-### 5. Test It!
+### 5. Test & Share!
 
 1. Record a few contractions
 2. Check they appear in Google Sheet
 3. Test offline mode
-4. Share Sheet link with family
+4. Click "Generate Shareable Link" in Settings
+5. Send the link to partner/midwife
+6. They click and use immediately - no setup!
 
 ## That's It!
 

@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Save, TestTube, CheckCircle, XCircle } from 'lucide-react';
-import { getGoogleSheetsConfig, setGoogleSheetsConfig } from '../../services/storage/localStorage';
+import { Save, TestTube, CheckCircle, XCircle, Share2, Copy } from 'lucide-react';
+import { getGoogleSheetsConfig, setGoogleSheetsConfig, hasGoogleSheetsConfig } from '../../services/storage/localStorage';
 import { validateGoogleSheetsConfig, extractSpreadsheetId } from '../../utils/validation';
 import { syncEngine } from '../../services/sync/syncEngine';
+import { generateShareableUrl } from '../../utils/urlConfig';
 
 const Settings = () => {
   const [config, setConfig] = useState({
@@ -15,6 +16,8 @@ const Settings = () => {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<'success' | 'error' | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
+  const [shareableLink, setShareableLink] = useState('');
+  const [showCopySuccess, setShowCopySuccess] = useState(false);
 
   useEffect(() => {
     const savedConfig = getGoogleSheetsConfig();
@@ -72,6 +75,27 @@ const Settings = () => {
       setErrors([error instanceof Error ? error.message : 'Connection test failed']);
     } finally {
       setTesting(false);
+    }
+  };
+
+  const handleGenerateLink = () => {
+    const validationErrors = validateGoogleSheetsConfig(config);
+    if (validationErrors.length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
+
+    const link = generateShareableUrl(config);
+    setShareableLink(link);
+  };
+
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareableLink);
+      setShowCopySuccess(true);
+      setTimeout(() => setShowCopySuccess(false), 2000);
+    } catch (error) {
+      alert('Failed to copy link. Please copy manually.');
     }
   };
 
@@ -191,6 +215,66 @@ const Settings = () => {
           </button>
         </div>
       </div>
+
+      {/* Shareable Link Section */}
+      {hasGoogleSheetsConfig() && (
+        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-6 rounded-lg space-y-4">
+          <div className="flex items-start gap-3">
+            <Share2 className="w-6 h-6 text-green-600 dark:text-green-400 mt-1" />
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold mb-2">Share with Family & Midwife</h3>
+              <p className="text-sm text-slate-700 dark:text-slate-300 mb-4">
+                Generate a link that automatically configures the app for others. They just click and start using it - no setup needed!
+              </p>
+
+              {!shareableLink ? (
+                <button
+                  onClick={handleGenerateLink}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                >
+                  <Share2 className="w-5 h-5" />
+                  Generate Shareable Link
+                </button>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={shareableLink}
+                      readOnly
+                      className="flex-1 px-3 py-2 bg-white dark:bg-slate-700 rounded-lg text-sm font-mono border border-green-300 dark:border-green-700"
+                    />
+                    <button
+                      onClick={handleCopyLink}
+                      className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                    >
+                      <Copy className="w-5 h-5" />
+                      {showCopySuccess ? 'Copied!' : 'Copy'}
+                    </button>
+                  </div>
+
+                  <div className="bg-white dark:bg-slate-800 p-3 rounded border border-green-200 dark:border-green-800">
+                    <p className="text-sm font-medium mb-2">How to share:</p>
+                    <ol className="text-sm text-slate-600 dark:text-slate-400 space-y-1 list-decimal list-inside">
+                      <li>Copy the link above</li>
+                      <li>Send it to your partner, midwife, or family via text/email</li>
+                      <li>They click the link and the app auto-configures</li>
+                      <li>Everyone tracks contractions to the same Google Sheet</li>
+                    </ol>
+                  </div>
+
+                  <button
+                    onClick={() => setShareableLink('')}
+                    className="text-sm text-green-600 dark:text-green-400 hover:underline"
+                  >
+                    Generate New Link
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-4 rounded-lg">
         <h4 className="font-semibold mb-2">Setup Instructions</h4>
