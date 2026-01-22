@@ -10,6 +10,7 @@ import ContractionSummary from './components/Timer/ContractionSummary';
 import ContractionList from './components/ContractionList/ContractionList';
 import ContractionChart from './components/Charts/ContractionChart';
 import Settings from './components/Settings/Settings';
+import DebugConsole from './components/Debug/DebugConsole';
 import { checkAndApplyUrlConfig } from './utils/urlConfig';
 
 type Tab = 'timer' | 'list' | 'chart' | 'settings';
@@ -63,6 +64,7 @@ function App() {
               </div>
             </main>
           </div>
+          <DebugConsole />
         </ContractionProvider>
       </SyncProvider>
     </ThemeProvider>
