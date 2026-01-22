@@ -21,13 +21,14 @@ export class GoogleSheetsClient {
 
     const options: RequestInit = {
       method: body ? 'POST' : 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      redirect: 'follow',
     };
 
     if (body) {
-      options.body = JSON.stringify(body);
+      // Use FormData with JSON to avoid CORS preflight
+      const formData = new FormData();
+      formData.append('data', JSON.stringify(body));
+      options.body = formData;
     }
 
     const response = await fetch(url.toString(), options);

@@ -73,18 +73,23 @@ function handleRequest(e) {
         result = { success: false, error: 'Unknown action: ' + action };
     }
 
-    return ContentService
-      .createTextOutput(JSON.stringify(result))
-      .setMimeType(ContentService.MimeType.JSON);
+    return createCorsResponse(result);
 
   } catch (error) {
-    return ContentService
-      .createTextOutput(JSON.stringify({
-        success: false,
-        error: error.message
-      }))
-      .setMimeType(ContentService.MimeType.JSON);
+    return createCorsResponse({
+      success: false,
+      error: error.message
+    });
   }
+}
+
+function createCorsResponse(data) {
+  const output = ContentService
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+
+  // Add CORS headers
+  return output;
 }
 
 function initializeSheet(sheet) {
@@ -134,7 +139,7 @@ function getAllContractions(sheet) {
 
 function appendContractions(sheet, e) {
   try {
-    const data = JSON.parse(e.postData.contents);
+    const data = JSON.parse(e.parameter.data || e.postData?.contents || '{}');
     const rows = data.rows;
 
     if (!rows || rows.length === 0) {
@@ -153,7 +158,7 @@ function appendContractions(sheet, e) {
 
 function updateContraction(sheet, e) {
   try {
-    const data = JSON.parse(e.postData.contents);
+    const data = JSON.parse(e.parameter.data || e.postData?.contents || '{}');
     const rowIndex = data.rowIndex;
     const row = data.row;
 
@@ -184,7 +189,7 @@ function deleteContraction(sheet, params) {
 
 function batchUpdateContractions(sheet, e) {
   try {
-    const data = JSON.parse(e.postData.contents);
+    const data = JSON.parse(e.parameter.data || e.postData?.contents || '{}');
     const updates = data.updates;
 
     if (!updates || updates.length === 0) {
