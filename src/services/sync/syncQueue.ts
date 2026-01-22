@@ -12,7 +12,7 @@ export class SyncQueue {
    * Add an operation to the sync queue
    */
   async enqueue(
-    type: 'create' | 'update' | 'delete',
+    type: 'create' | 'update' | 'delete' | 'archive' | 'restore',
     contractionId: string,
     data: any
   ): Promise<void> {
