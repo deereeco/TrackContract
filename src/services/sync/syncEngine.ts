@@ -139,13 +139,12 @@ export class SyncEngine {
         break;
 
       case 'archive':
-        if (contraction.sheetRowId) {
-          await this.client.archiveContraction(contraction.id, contraction.sheetRowId);
-          await dbOperations.updateContraction(contraction.id, {
-            archived: true,
-            syncStatus: 'synced',
-          });
-        }
+        // Archive by ID - the Apps Script will find it in the sheet
+        await this.client.archiveContraction(contraction.id);
+        await dbOperations.updateContraction(contraction.id, {
+          archived: true,
+          syncStatus: 'synced',
+        });
         break;
 
       case 'restore':

@@ -90,7 +90,7 @@ const ContractionList = () => {
             title="Sync now"
           >
             <RefreshCw className={`w-5 h-5 ${syncState.status === 'syncing' ? 'animate-spin' : ''}`} />
-            Sync
+            Sync To Google Sheet
           </button>
           <button
             onClick={() => setShowForm(true)}

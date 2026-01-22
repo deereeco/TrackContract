@@ -277,10 +277,10 @@ function batchUpdateContractions(sheet, e) {
 
 function archiveContraction(sheet, params) {
   try {
-    const rowIndex = parseInt(params.rowIndex);
+    const contractionId = params.contractionId;
 
-    if (!rowIndex) {
-      return { success: false, error: 'Missing rowIndex' };
+    if (!contractionId) {
+      return { success: false, error: 'Missing contractionId' };
     }
 
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -292,6 +292,26 @@ function archiveContraction(sheet, params) {
       // Copy headers from main sheet
       const headers = sheet.getRange(1, 1, 1, 9).getValues();
       archiveSheet.getRange(1, 1, 1, 9).setValues(headers);
+    }
+
+    // Find the row with this contraction ID
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 1) {
+      return { success: false, error: 'No data to archive' };
+    }
+
+    const allData = sheet.getRange(2, 1, lastRow - 1, 9).getValues();
+    let rowIndex = -1;
+
+    for (let i = 0; i < allData.length; i++) {
+      if (allData[i][0] === contractionId) {
+        rowIndex = i + 2; // +2 because of header and 0-based index
+        break;
+      }
+    }
+
+    if (rowIndex === -1) {
+      return { success: false, error: 'Contraction not found in sheet' };
     }
 
     // Get the row data

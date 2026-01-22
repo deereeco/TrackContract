@@ -134,9 +134,9 @@ export class GoogleSheetsClient {
   /**
    * Archive a contraction (move to Archived Contractions sheet)
    */
-  async archiveContraction(_contractionId: string, sheetRowId: number): Promise<void> {
+  async archiveContraction(contractionId: string): Promise<void> {
     try {
-      await this.request('archive', { rowIndex: sheetRowId });
+      await this.request('archive', { contractionId });
     } catch (error) {
       console.error('Failed to archive contraction:', error);
       throw error;
