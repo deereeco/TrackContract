@@ -1,12 +1,14 @@
 import { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, RefreshCw } from 'lucide-react';
 import { useContractions } from '../../contexts/ContractionContext';
+import { useSync } from '../../contexts/SyncContext';
 import ContractionItem from './ContractionItem';
 import ContractionForm from './ContractionForm';
 
 const ContractionList = () => {
   const { state } = useContractions();
   const { contractions, loading } = state;
+  const { syncState, triggerSync } = useSync();
   const [showForm, setShowForm] = useState(false);
 
   if (loading) {
@@ -37,14 +39,38 @@ const ContractionList = () => {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">All Contractions ({contractions.length})</h2>
-        <button
-          onClick={() => setShowForm(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg transition-colors"
-        >
-          <Plus className="w-5 h-5" />
-          Add
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={triggerSync}
+            disabled={syncState.status === 'syncing'}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-900 dark:text-white rounded-lg transition-colors disabled:opacity-50"
+            title="Sync now"
+          >
+            <RefreshCw className={`w-5 h-5 ${syncState.status === 'syncing' ? 'animate-spin' : ''}`} />
+            Sync
+          </button>
+          <button
+            onClick={() => setShowForm(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg transition-colors"
+          >
+            <Plus className="w-5 h-5" />
+            Add
+          </button>
+        </div>
       </div>
+
+      {syncState.pendingOperations > 0 && (
+        <div className="text-sm text-slate-600 dark:text-slate-400 flex items-center gap-2">
+          <RefreshCw className="w-4 h-4" />
+          {syncState.pendingOperations} contraction{syncState.pendingOperations !== 1 ? 's' : ''} pending sync
+        </div>
+      )}
+
+      {syncState.status === 'error' && syncState.error && (
+        <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg">
+          Sync error: {syncState.error}
+        </div>
+      )}
 
       <div className="space-y-2">
         {contractions.map((contraction, index) => (
