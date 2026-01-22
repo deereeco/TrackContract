@@ -2,17 +2,15 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Save, TestTube, CheckCircle, XCircle, Share2, Copy } from 'lucide-react';
 import { getGoogleSheetsConfig, setGoogleSheetsConfig, hasGoogleSheetsConfig } from '../../services/storage/localStorage';
-import { validateGoogleSheetsConfig, extractSpreadsheetId } from '../../utils/validation';
+import { validateGoogleSheetsConfig } from '../../utils/validation';
 import { syncEngine } from '../../services/sync/syncEngine';
 import { generateShareableUrl } from '../../utils/urlConfig';
 
 const Settings = () => {
   const [config, setConfig] = useState({
-    apiKey: '',
-    spreadsheetId: '',
+    scriptUrl: '',
     sheetName: 'Contractions',
   });
-  const [sheetUrl, setSheetUrl] = useState('');
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<'success' | 'error' | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
@@ -25,14 +23,6 @@ const Settings = () => {
       setConfig(savedConfig);
     }
   }, []);
-
-  const handleSheetUrlChange = (url: string) => {
-    setSheetUrl(url);
-    const spreadsheetId = extractSpreadsheetId(url);
-    if (spreadsheetId) {
-      setConfig({ ...config, spreadsheetId });
-    }
-  };
 
   const handleSave = () => {
     const validationErrors = validateGoogleSheetsConfig(config);
@@ -113,35 +103,18 @@ const Settings = () => {
 
         <div>
           <label className="block text-sm font-medium mb-2">
-            API Key
-            <span className="text-red-500 ml-1">*</span>
-          </label>
-          <input
-            type="password"
-            value={config.apiKey}
-            onChange={(e) => setConfig({ ...config, apiKey: e.target.value })}
-            placeholder="Enter your Google API key"
-            className="w-full px-3 py-2 bg-white dark:bg-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-          />
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Create an API key in Google Cloud Console with Sheets API enabled
-          </p>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-2">
-            Google Sheet URL
+            Apps Script Deployment URL
             <span className="text-red-500 ml-1">*</span>
           </label>
           <input
             type="text"
-            value={sheetUrl}
-            onChange={(e) => handleSheetUrlChange(e.target.value)}
-            placeholder="https://docs.google.com/spreadsheets/d/..."
+            value={config.scriptUrl}
+            onChange={(e) => setConfig({ ...config, scriptUrl: e.target.value })}
+            placeholder="https://script.google.com/macros/s/..."
             className="w-full px-3 py-2 bg-white dark:bg-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
           />
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Paste the full URL of your Google Sheet
+            Deploy the Apps Script and paste the web app URL here
           </p>
         </div>
 
@@ -280,13 +253,17 @@ const Settings = () => {
         <h4 className="font-semibold mb-2">Setup Instructions</h4>
         <ol className="list-decimal list-inside space-y-2 text-sm text-slate-700 dark:text-slate-300">
           <li>Create a new Google Sheet</li>
-          <li>Share it publicly or with specific people</li>
-          <li>Go to Google Cloud Console and create a project</li>
-          <li>Enable the Google Sheets API</li>
-          <li>Create an API key (restrict to Sheets API)</li>
-          <li>Copy the API key and Sheet URL above</li>
+          <li>Open the sheet and go to Extensions &gt; Apps Script</li>
+          <li>Copy the code from GoogleAppsScript.js in the project root</li>
+          <li>Paste it into the Apps Script editor (replace any existing code)</li>
+          <li>Click Deploy &gt; New deployment</li>
+          <li>Select type: Web app, Execute as: Me, Who has access: Anyone</li>
+          <li>Copy the deployment URL and paste it above</li>
           <li>Test the connection, then save</li>
         </ol>
+        <p className="text-xs text-slate-600 dark:text-slate-400 mt-3">
+          Note: The GoogleAppsScript.js file is in your project root directory
+        </p>
       </div>
     </div>
   );

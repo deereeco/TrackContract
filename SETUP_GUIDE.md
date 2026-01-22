@@ -31,72 +31,34 @@ The app currently has placeholder icons. Create proper icons before deployment:
 3. Rename it to something like "Labor Contractions Tracker"
 4. Keep the default first tab name as "Contractions" (or note if you change it)
 
-#### Step 2: Configure Sharing
+#### Step 2: Deploy Google Apps Script
 
-**Option A: Share with Specific People** (More Secure)
-1. Click the "Share" button
-2. Add email addresses of:
-   - Your spouse/partner
-   - Midwife
-   - Doula
-   - Family members who need access
-3. Set permission to "Editor" for those who might need to add notes
-4. Click "Done"
+1. In your Google Sheet, go to **Extensions** > **Apps Script**
+2. Delete any existing code in the editor
+3. Open the `GoogleAppsScript.js` file from this repository
+4. Copy all the code
+5. Paste it into the Apps Script editor
+6. Click the **Save** icon (disk icon) or press Ctrl+S
+7. Click **Deploy** > **New deployment**
+8. Click the gear icon next to "Select type"
+9. Select **Web app**
+10. Configure the deployment:
+    - **Description**: "Contraction Tracker Sync" (optional)
+    - **Execute as**: Me (your@email.com)
+    - **Who has access**: Anyone
+11. Click **Deploy**
+12. Review permissions:
+    - Click **Authorize access**
+    - Choose your Google account
+    - Click **Advanced** > **Go to [Project name] (unsafe)**
+    - Click **Allow**
+13. Copy the **Web app URL** (it starts with `https://script.google.com/macros/s/...`)
+14. Keep this URL safe - you'll need it to configure the app
 
-**Option B: Anyone with Link** (Easier Setup)
-1. Click "Share" button
-2. Click "Change to anyone with the link"
-3. Set to "Editor" access
-4. Copy the link for sharing
-5. Click "Done"
-
-**Security Note:** Option A is more secure, but Option B is fine for temporary use during labor.
-
-#### Step 3: Create Google Cloud Project
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com)
-2. Click "Select a project" dropdown
-3. Click "New Project"
-4. Enter project name: "Contraction Tracker"
-5. Click "Create"
-6. Wait for project creation (may take 30 seconds)
-
-#### Step 4: Enable Google Sheets API
-
-1. From the Cloud Console dashboard, click "Enable APIs and Services"
-2. Search for "Google Sheets API"
-3. Click on "Google Sheets API" result
-4. Click "Enable"
-5. Wait for API to be enabled
-
-#### Step 5: Create API Key
-
-1. Go to "APIs & Services" > "Credentials"
-2. Click "Create Credentials" dropdown
-3. Select "API Key"
-4. Copy the API key immediately (store in password manager)
-5. Click "Restrict Key" (recommended)
-
-#### Step 6: Restrict API Key (Recommended)
-
-**API Restrictions:**
-1. Under "API restrictions", select "Restrict key"
-2. Check only "Google Sheets API"
-3. Click "Save"
-
-**Application Restrictions** (after deployment):
-1. Select "HTTP referrers (web sites)"
-2. Add your GitHub Pages URL:
-   ```
-   https://yourusername.github.io/Contract-Track/*
-   ```
-3. For local development, also add:
-   ```
-   http://localhost:5173/*
-   ```
-4. Click "Save"
-
-**Note:** You can add application restrictions after deploying to GitHub Pages.
+**Important Notes:**
+- The script runs with YOUR permissions, so it can write to your sheet
+- "Anyone" access means anyone with the URL can use it
+- You can disable the deployment anytime from Apps Script > Deploy > Manage deployments
 
 ### 3. GitHub Pages Deployment
 
@@ -141,11 +103,10 @@ The GitHub Actions workflow will automatically:
 
 1. Open the deployed app in your browser
 2. Navigate to the "Settings" tab
-3. Enter your Google API key
-4. Paste your Google Sheet URL
-5. Verify the sheet name (default: "Contractions")
-6. Click "Test Connection"
-7. If successful, click "Save Settings"
+3. Paste your **Apps Script deployment URL** (from Step 2)
+4. Verify the sheet name (default: "Contractions")
+5. Click "Test Connection"
+6. If successful, click "Save Settings"
 
 #### Test the Integration
 
@@ -245,16 +206,16 @@ Love,
 ### "Sync Failed" Error
 
 **Possible Causes:**
-1. API key is incorrect
-2. Google Sheet is private
-3. Sheets API not enabled
-4. API key restrictions too strict
+1. Apps Script deployment URL is incorrect
+2. Apps Script not deployed as "Web app"
+3. Apps Script "Who has access" set to wrong value
+4. Apps Script authorization not completed
 
 **Solutions:**
-1. Verify API key in Settings
-2. Check Sheet sharing settings
-3. Confirm Sheets API is enabled in Cloud Console
-4. Temporarily remove API restrictions to test
+1. Verify deployment URL in Settings (should start with https://script.google.com/macros/s/)
+2. In Apps Script, check Deploy > Manage deployments > ensure type is "Web app"
+3. Ensure "Who has access" is set to "Anyone"
+4. Re-authorize the script if needed (Deploy > New deployment)
 
 ### Contractions Not Appearing in Sheet
 
@@ -390,21 +351,21 @@ If you want to customize the Google Sheet:
 3. Both devices will sync to same sheet
 4. Data merges automatically
 
-**Security Note:** The shareable link contains your API key encoded in the URL. The link clears from the browser after configuration, but only share with trusted people (partner, midwife, doula).
+**Security Note:** The shareable link contains your Apps Script deployment URL encoded in the URL. The link clears from the browser after configuration, but only share with trusted people (partner, midwife, doula).
 
-### API Key Security
+### Deployment URL Security
 
 **Best Practices:**
-- Use application restrictions
-- Limit to Sheets API only
-- Don't share API key publicly
-- Rotate key after labor if shared
+- Only share deployment URL with trusted people (partner, midwife, doula)
+- The URL allows anyone to write to your sheet
+- You can disable the deployment anytime
 
 **If Compromised:**
-1. Go to Cloud Console
-2. Disable/delete old key
-3. Create new key
-4. Update app Settings
+1. Go to Apps Script editor
+2. Click Deploy > Manage deployments
+3. Click Archive on the compromised deployment
+4. Create a new deployment (Deploy > New deployment)
+5. Update app Settings with new URL
 
 ## Support
 

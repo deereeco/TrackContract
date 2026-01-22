@@ -18,8 +18,7 @@ export interface SyncOperation {
 }
 
 export interface GoogleSheetsConfig {
-  apiKey: string;
-  spreadsheetId: string;
+  scriptUrl: string;
   sheetName: string;
 }
 

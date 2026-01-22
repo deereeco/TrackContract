@@ -53,12 +53,10 @@ export const validateContraction = (contraction: Partial<Contraction>): string[]
 export const validateGoogleSheetsConfig = (config: any): string[] => {
   const errors: string[] = [];
 
-  if (!config.apiKey || typeof config.apiKey !== 'string' || config.apiKey.trim() === '') {
-    errors.push('API key is required');
-  }
-
-  if (!config.spreadsheetId || typeof config.spreadsheetId !== 'string' || config.spreadsheetId.trim() === '') {
-    errors.push('Spreadsheet ID is required');
+  if (!config.scriptUrl || typeof config.scriptUrl !== 'string' || config.scriptUrl.trim() === '') {
+    errors.push('Apps Script URL is required');
+  } else if (!config.scriptUrl.startsWith('https://script.google.com/')) {
+    errors.push('Apps Script URL must start with https://script.google.com/');
   }
 
   if (!config.sheetName || typeof config.sheetName !== 'string' || config.sheetName.trim() === '') {
@@ -66,14 +64,6 @@ export const validateGoogleSheetsConfig = (config: any): string[] => {
   }
 
   return errors;
-};
-
-/**
- * Extract spreadsheet ID from a Google Sheets URL
- */
-export const extractSpreadsheetId = (url: string): string | null => {
-  const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-  return match ? match[1] : null;
 };
 
 /**

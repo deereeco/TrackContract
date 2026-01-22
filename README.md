@@ -48,38 +48,28 @@ npm run deploy
 1. Go to [Google Sheets](https://sheets.google.com)
 2. Create a new spreadsheet
 3. Name the first tab "Contractions" (or your preferred name)
-4. Share the sheet:
-   - Click "Share" button
-   - Set to "Anyone with the link can edit" OR
-   - Share with specific email addresses
 
-### 2. Create Google Cloud Project & API Key
+### 2. Deploy Google Apps Script
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com)
-2. Create a new project (or select existing)
-3. Enable Google Sheets API:
-   - Go to "APIs & Services" > "Library"
-   - Search for "Google Sheets API"
-   - Click "Enable"
-4. Create API Key:
-   - Go to "APIs & Services" > "Credentials"
-   - Click "Create Credentials" > "API Key"
-   - **Restrict the key** (recommended):
-     - Click on the created key
-     - Under "API restrictions", select "Restrict key"
-     - Select "Google Sheets API"
-     - Under "Application restrictions", choose "HTTP referrers"
-     - Add your domain (e.g., `https://yourusername.github.io/*`)
-   - Copy the API key
+1. Open your Google Sheet
+2. Go to **Extensions** > **Apps Script**
+3. Delete any existing code
+4. Copy the code from `GoogleAppsScript.js` in this repository
+5. Paste it into the Apps Script editor
+6. Click **Deploy** > **New deployment**
+7. Select type: **Web app**
+8. Set "Execute as": **Me**
+9. Set "Who has access": **Anyone**
+10. Click **Deploy**
+11. Copy the deployment URL
 
 ### 3. Configure the App
 
 1. Open the app and navigate to the **Settings** tab
-2. Paste your **API Key**
-3. Paste your **Google Sheet URL**
-4. Verify the **Sheet Name** (default: "Contractions")
-5. Click **Test Connection** to verify
-6. Click **Save Settings**
+2. Paste your **Apps Script deployment URL**
+3. Verify the **Sheet Name** (default: "Contractions")
+4. Click **Test Connection** to verify
+5. Click **Save Settings**
 
 ## Usage
 
@@ -190,19 +180,19 @@ No environment variables needed. API key and sheet ID are configured in the app'
 
 ## Privacy & Security
 
-- **API Key Storage**: Stored in browser's localStorage (client-side only)
+- **Script URL Storage**: Stored in browser's localStorage (client-side only)
 - **Data Storage**: All data stored locally in browser's IndexedDB
-- **No Server**: No backend server, direct client-to-Google Sheets communication
-- **Google Sheets Access**: Uses API key authentication (not OAuth)
-- **Recommendation**: Use API key restrictions in Google Cloud Console
+- **No Server**: No backend server, uses Google Apps Script as proxy to Google Sheets
+- **Google Sheets Access**: Uses Google Apps Script deployment (runs with your Google account permissions)
+- **Security**: Only people with the deployment URL can write to your sheet
 
 ## Troubleshooting
 
 ### Sync Not Working
 
 1. Check internet connection
-2. Verify API key is correct in Settings
-3. Ensure Google Sheet is shared (not private)
+2. Verify Apps Script deployment URL is correct in Settings
+3. Ensure Apps Script is deployed as "Web app" with "Anyone" access
 4. Check browser console for errors
 5. Test connection in Settings tab
 
