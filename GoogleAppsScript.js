@@ -105,8 +105,36 @@ function initializeSheet(sheet) {
 
   // If sheet is empty or only has one row, add headers
   if (lastRow === 0) {
-    const headers = ['id', 'startTime', 'endTime', 'duration', 'intensity', 'notes', 'createdAt', 'updatedAt', 'deleted'];
+    const headers = [
+      'ID',
+      'Start Time',
+      'End Time',
+      'Duration (seconds)',
+      'Intensity (1-10)',
+      'Notes',
+      'Created At',
+      'Updated At',
+      'Deleted'
+    ];
     sheet.appendRow(headers);
+
+    // Format header row
+    const headerRange = sheet.getRange(1, 1, 1, headers.length);
+    headerRange.setFontWeight('bold');
+    headerRange.setBackground('#4285f4');
+    headerRange.setFontColor('#ffffff');
+
+    // Set column widths
+    sheet.setColumnWidth(1, 250); // ID
+    sheet.setColumnWidth(2, 180); // Start Time
+    sheet.setColumnWidth(3, 180); // End Time
+    sheet.setColumnWidth(4, 120); // Duration
+    sheet.setColumnWidth(5, 100); // Intensity
+    sheet.setColumnWidth(6, 300); // Notes
+    sheet.setColumnWidth(7, 180); // Created At
+    sheet.setColumnWidth(8, 180); // Updated At
+    sheet.setColumnWidth(9, 80);  // Deleted
+
     return { success: true, message: 'Sheet initialized with headers' };
   }
 
@@ -154,8 +182,40 @@ function appendContractions(sheet, e) {
       return { success: false, error: 'No rows to append' };
     }
 
-    rows.forEach(row => {
-      sheet.appendRow(row);
+    const startRow = sheet.getLastRow() + 1;
+
+    rows.forEach((row, index) => {
+      // Convert timestamps to dates for columns 2, 3, 7, 8 (startTime, endTime, createdAt, updatedAt)
+      const formattedRow = [...row];
+
+      // startTime (column 2)
+      if (formattedRow[1]) {
+        formattedRow[1] = new Date(Number(formattedRow[1]));
+      }
+
+      // endTime (column 3)
+      if (formattedRow[2]) {
+        formattedRow[2] = new Date(Number(formattedRow[2]));
+      }
+
+      // createdAt (column 7)
+      if (formattedRow[6]) {
+        formattedRow[6] = new Date(Number(formattedRow[6]));
+      }
+
+      // updatedAt (column 8)
+      if (formattedRow[7]) {
+        formattedRow[7] = new Date(Number(formattedRow[7]));
+      }
+
+      sheet.appendRow(formattedRow);
+
+      // Format the date columns
+      const currentRow = startRow + index;
+      sheet.getRange(currentRow, 2).setNumberFormat('yyyy-MM-dd HH:mm:ss'); // startTime
+      sheet.getRange(currentRow, 3).setNumberFormat('yyyy-MM-dd HH:mm:ss'); // endTime
+      sheet.getRange(currentRow, 7).setNumberFormat('yyyy-MM-dd HH:mm:ss'); // createdAt
+      sheet.getRange(currentRow, 8).setNumberFormat('yyyy-MM-dd HH:mm:ss'); // updatedAt
     });
 
     return { success: true, message: `Appended ${rows.length} row(s)` };

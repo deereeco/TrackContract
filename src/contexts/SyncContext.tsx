@@ -68,6 +68,9 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
         lastSyncTime: now,
         pendingOperations: pendingCount
       });
+
+      // Dispatch event so other components can refresh their data
+      window.dispatchEvent(new CustomEvent('sync-completed'));
     } catch (error) {
       console.error('Sync error:', error);
       setSyncState(prev => ({

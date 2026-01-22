@@ -202,6 +202,17 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     return () => clearInterval(interval);
   }, [state.timerState.isRunning, state.timerState.startTime]);
 
+  // Listen for sync completion and refresh contractions
+  useEffect(() => {
+    const handleSyncCompleted = async () => {
+      const contractions = await dbOperations.getAllContractions();
+      dispatch({ type: 'SET_CONTRACTIONS', payload: contractions });
+    };
+
+    window.addEventListener('sync-completed', handleSyncCompleted);
+    return () => window.removeEventListener('sync-completed', handleSyncCompleted);
+  }, []);
+
   const startContraction = useCallback(() => {
     if (state.timerState.isRunning) return;
     dispatch({ type: 'START_TIMER' });
