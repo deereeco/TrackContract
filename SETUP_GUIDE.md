@@ -88,7 +88,7 @@ git push origin main
 The GitHub Actions workflow will automatically:
 - Build the app
 - Deploy to GitHub Pages
-- Make it available at: `https://yourusername.github.io/Contract-Track/`
+- Make it available at: `https://yourusername.github.io/TrackContract/`
 
 #### Verify Deployment
 
@@ -127,7 +127,7 @@ The GitHub Actions workflow will automatically:
 - No app access needed
 
 **Option 2: Share App + Sheet**
-- Share the app URL: `https://yourusername.github.io/Contract-Track/`
+- Share the app URL: `https://yourusername.github.io/TrackContract/`
 - Share the Google Sheet link
 - They can view data in either location
 

@@ -29,12 +29,10 @@ Use [Favicon.io](https://favicon.io/) or similar to generate icons.
 ### 2. Set Up Google Sheets
 
 1. Create a Google Sheet
-2. Share it (public or with specific people)
-3. Go to [Google Cloud Console](https://console.cloud.google.com)
-4. Create a project
-5. Enable "Google Sheets API"
-6. Create an API key
-7. Restrict to Sheets API only
+2. Go to Extensions > Apps Script
+3. Copy code from `GoogleAppsScript.js` in repo
+4. Deploy as Web app (Execute as: Me, Access: Anyone)
+5. Copy the deployment URL
 
 ### 3. Deploy to GitHub Pages
 
@@ -54,7 +52,7 @@ npm run deploy
 
 1. Open deployed app
 2. Go to Settings tab
-3. Enter API key and Sheet URL
+3. Paste Apps Script deployment URL
 4. Test connection
 5. Save settings
 
@@ -73,7 +71,7 @@ See [SETUP_GUIDE.md](./SETUP_GUIDE.md) for detailed instructions.
 
 ## App URL
 
-After deployment: `https://yourusername.github.io/Contract-Track/`
+After deployment: `https://yourusername.github.io/TrackContract/`
 
 ## Need Help?
 
