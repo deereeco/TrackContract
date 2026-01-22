@@ -228,6 +228,9 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     try {
       await dbOperations.addContraction(completedContraction);
 
+      // Queue for sync
+      await syncEngine.queueContraction('create', completedContraction.id, completedContraction);
+
       // Add to history
       const timeStr = formatTime(completedContraction.startTime);
       await historyManager.addEntry(
@@ -259,6 +262,9 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     try {
       await dbOperations.addContraction(newContraction);
 
+      // Queue for sync
+      await syncEngine.queueContraction('create', newContraction.id, newContraction);
+
       // Add to history
       const timeStr = formatTime(newContraction.startTime);
       await historyManager.addEntry(
@@ -278,7 +284,13 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     dispatch({ type: 'UPDATE_CONTRACTION', payload: { id, updates } });
 
     try {
+      const contraction = await dbOperations.getContraction(id);
       await dbOperations.updateContraction(id, updates);
+
+      // Queue for sync if the update is user-facing (not internal sync updates)
+      if (contraction && !updates.syncStatus && !updates.syncedAt) {
+        await syncEngine.queueContraction('update', id, { ...contraction, ...updates });
+      }
     } catch (error) {
       console.error('Failed to update contraction:', error);
       throw error;
