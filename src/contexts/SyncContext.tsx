@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { SyncState } from '../types/sync';
 import { getLastSyncTime, setLastSyncTime } from '../services/storage/localStorage';
+import { syncEngine } from '../services/sync/syncEngine';
 
 interface SyncContextType {
   syncState: SyncState;
@@ -46,19 +47,29 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
+    if (!syncEngine.isConfigured()) {
+      // No sync configured, skip silently
+      return;
+    }
+
     setSyncState(prev => ({ ...prev, status: 'syncing' }));
 
     try {
-      // Sync logic will be implemented in the sync engine
-      // For now, just update the state
+      // Run incremental sync to push pending changes
+      await syncEngine.incrementalSync();
+
       const now = Date.now();
       setLastSyncTime(now);
+
+      const pendingCount = await syncEngine.getPendingCount();
+
       setSyncState({
         status: 'idle',
         lastSyncTime: now,
-        pendingOperations: 0
+        pendingOperations: pendingCount
       });
     } catch (error) {
+      console.error('Sync error:', error);
       setSyncState(prev => ({
         ...prev,
         status: 'error',
@@ -66,6 +77,13 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }));
     }
   }, [isOnline]);
+
+  // Initial sync on mount if configured
+  useEffect(() => {
+    if (isOnline && syncEngine.isConfigured()) {
+      triggerSync();
+    }
+  }, []); // Run once on mount
 
   // Background sync every 60 seconds when online
   useEffect(() => {
