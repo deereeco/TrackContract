@@ -10,6 +10,7 @@ export interface Contraction {
   syncStatus: 'synced' | 'pending' | 'conflict';
   syncedAt?: number;             // Last sync time
   sheetRowId?: number;           // Google Sheet row
+  archived?: boolean;            // Soft-deleted/archived
 }
 
 export interface ContractionStats {

@@ -132,6 +132,30 @@ export class GoogleSheetsClient {
   }
 
   /**
+   * Archive a contraction (move to Archived Contractions sheet)
+   */
+  async archiveContraction(_contractionId: string, sheetRowId: number): Promise<void> {
+    try {
+      await this.request('archive', { rowIndex: sheetRowId });
+    } catch (error) {
+      console.error('Failed to archive contraction:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Archive all contractions (move to Archived Contractions sheet)
+   */
+  async archiveAllContractions(contractionIds: string[]): Promise<void> {
+    try {
+      await this.request('archiveAll', {}, { contractionIds });
+    } catch (error) {
+      console.error('Failed to archive all contractions:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Batch update multiple contractions
    */
   async batchUpdate(contractions: Contraction[]): Promise<void> {

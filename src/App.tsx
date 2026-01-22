@@ -5,6 +5,7 @@ import { SyncProvider } from './contexts/SyncContext';
 import Header from './components/Layout/Header';
 import Navigation from './components/Layout/Navigation';
 import TimerButton from './components/Timer/TimerButton';
+import IntensityToggle from './components/Timer/IntensityToggle';
 import ContractionSummary from './components/Timer/ContractionSummary';
 import ContractionList from './components/ContractionList/ContractionList';
 import ContractionChart from './components/Charts/ContractionChart';
@@ -49,6 +50,7 @@ function App() {
                 {activeTab === 'timer' && (
                   <div className="space-y-8">
                     <TimerButton />
+                    <IntensityToggle />
                     <ContractionSummary />
                   </div>
                 )}

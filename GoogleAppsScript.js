@@ -65,6 +65,14 @@ function handleRequest(e) {
         result = batchUpdateContractions(sheet, e);
         break;
 
+      case 'archive':
+        result = archiveContraction(sheet, params);
+        break;
+
+      case 'archiveAll':
+        result = archiveAllContractions(sheet, e);
+        break;
+
       case 'test':
         result = { success: true, message: 'Connection successful' };
         break;
@@ -204,5 +212,96 @@ function batchUpdateContractions(sheet, e) {
     return { success: true, message: `Updated ${updates.length} row(s)` };
   } catch (error) {
     return { success: false, error: 'Failed to batch update: ' + error.message };
+  }
+}
+
+function archiveContraction(sheet, params) {
+  try {
+    const rowIndex = parseInt(params.rowIndex);
+
+    if (!rowIndex) {
+      return { success: false, error: 'Missing rowIndex' };
+    }
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let archiveSheet = ss.getSheetByName('Archived Contractions');
+
+    // Create archive sheet if it doesn't exist
+    if (!archiveSheet) {
+      archiveSheet = ss.insertSheet('Archived Contractions');
+      // Copy headers from main sheet
+      const headers = sheet.getRange(1, 1, 1, 9).getValues();
+      archiveSheet.getRange(1, 1, 1, 9).setValues(headers);
+    }
+
+    // Get the row data
+    const rowData = sheet.getRange(rowIndex, 1, 1, 9).getValues();
+
+    // Append to archive sheet
+    archiveSheet.appendRow(rowData[0]);
+
+    // Delete from main sheet
+    sheet.deleteRow(rowIndex);
+
+    return { success: true, message: 'Contraction archived' };
+  } catch (error) {
+    return { success: false, error: 'Failed to archive: ' + error.message };
+  }
+}
+
+function archiveAllContractions(sheet, e) {
+  try {
+    const data = JSON.parse(e.parameter.data || e.postData?.contents || '{}');
+    const contractionIds = data.contractionIds;
+
+    if (!contractionIds || contractionIds.length === 0) {
+      return { success: false, error: 'No contraction IDs provided' };
+    }
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let archiveSheet = ss.getSheetByName('Archived Contractions');
+
+    // Create archive sheet if it doesn't exist
+    if (!archiveSheet) {
+      archiveSheet = ss.insertSheet('Archived Contractions');
+      // Copy headers from main sheet
+      const headers = sheet.getRange(1, 1, 1, 9).getValues();
+      archiveSheet.getRange(1, 1, 1, 9).setValues(headers);
+    }
+
+    // Get all data from main sheet
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 1) {
+      return { success: true, message: 'No contractions to archive' };
+    }
+
+    const allData = sheet.getRange(2, 1, lastRow - 1, 9).getValues();
+
+    // Find rows matching contraction IDs
+    const rowsToArchive = [];
+    const rowIndexesToDelete = [];
+
+    allData.forEach((row, index) => {
+      if (contractionIds.includes(row[0])) {
+        rowsToArchive.push(row);
+        rowIndexesToDelete.push(index + 2); // +2 because of header and 0-based index
+      }
+    });
+
+    // Append rows to archive sheet
+    if (rowsToArchive.length > 0) {
+      rowsToArchive.forEach(row => {
+        archiveSheet.appendRow(row);
+      });
+
+      // Delete rows from main sheet (reverse order to maintain indices)
+      rowIndexesToDelete.reverse().forEach(rowIndex => {
+        sheet.deleteRow(rowIndex);
+      });
+    }
+
+    return { success: true, message: `Archived ${rowsToArchive.length} contraction(s)` };
+  } catch (error) {
+    return { success: false, error: 'Failed to archive all: ' + error.message };
   }
 }

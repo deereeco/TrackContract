@@ -137,6 +137,26 @@ export class SyncEngine {
           await this.client.deleteContraction(contraction.id, contraction.sheetRowId);
         }
         break;
+
+      case 'archive':
+        if (contraction.sheetRowId) {
+          await this.client.archiveContraction(contraction.id, contraction.sheetRowId);
+          await dbOperations.updateContraction(contraction.id, {
+            archived: true,
+            syncStatus: 'synced',
+          });
+        }
+        break;
+
+      case 'restore':
+        // Restore means un-archive and re-append to main sheet
+        await this.client.appendContractions([contraction]);
+        await dbOperations.updateContraction(contraction.id, {
+          archived: false,
+          syncStatus: 'synced',
+          syncedAt: Date.now(),
+        });
+        break;
     }
   }
 
@@ -144,11 +164,34 @@ export class SyncEngine {
    * Queue a contraction for sync
    */
   async queueContraction(
-    type: 'create' | 'update' | 'delete',
+    type: 'create' | 'update' | 'delete' | 'archive' | 'restore',
     contractionId: string,
     data: any
   ): Promise<void> {
     await this.queue.enqueue(type, contractionId, data);
+  }
+
+  /**
+   * Queue multiple contractions for archiving
+   */
+  async queueArchiveAll(contractionIds: string[]): Promise<void> {
+    if (!this.client) throw new Error('Sync client not initialized');
+
+    try {
+      // Archive all in one request
+      await this.client.archiveAllContractions(contractionIds);
+
+      // Update all contractions in local DB
+      for (const id of contractionIds) {
+        await dbOperations.updateContraction(id, {
+          archived: true,
+          syncStatus: 'synced',
+        });
+      }
+    } catch (error) {
+      console.error('Failed to queue archive all:', error);
+      throw error;
+    }
   }
 
   /**

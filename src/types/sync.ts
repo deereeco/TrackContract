@@ -9,7 +9,7 @@ export interface SyncState {
 
 export interface SyncOperation {
   id: string;
-  type: 'create' | 'update' | 'delete';
+  type: 'create' | 'update' | 'delete' | 'archive' | 'restore';
   contractionId: string;
   data: any;
   timestamp: number;

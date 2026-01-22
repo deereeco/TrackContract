@@ -1,8 +1,11 @@
-import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useCallback, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { Contraction, TimerState } from '../types/contraction';
 import { dbOperations } from '../services/storage/db';
 import { calculateDuration } from '../utils/calculations';
+import { syncEngine } from '../services/sync/syncEngine';
+import { historyManager } from '../services/history/historyManager';
+import { formatTime } from '../utils/dateTime';
 
 interface ContractionState {
   contractions: Contraction[];
@@ -11,13 +14,20 @@ interface ContractionState {
   loading: boolean;
 }
 
+interface HistoryUIState {
+  canUndo: boolean;
+  canRedo: boolean;
+  undoDescription: string | null;
+  redoDescription: string | null;
+}
+
 type ContractionAction =
   | { type: 'SET_CONTRACTIONS'; payload: Contraction[] }
   | { type: 'ADD_CONTRACTION'; payload: Contraction }
   | { type: 'UPDATE_CONTRACTION'; payload: { id: string; updates: Partial<Contraction> } }
   | { type: 'DELETE_CONTRACTION'; payload: string }
   | { type: 'START_TIMER' }
-  | { type: 'STOP_TIMER'; payload: { endTime: number; duration: number } }
+  | { type: 'STOP_TIMER'; payload: { endTime: number; duration: number; intensity?: number } }
   | { type: 'UPDATE_TIMER'; payload: number }
   | { type: 'SET_LOADING'; payload: boolean };
 
@@ -91,6 +101,7 @@ const contractionReducer = (state: ContractionState, action: ContractionAction):
         ...state.activeContraction,
         endTime: action.payload.endTime,
         duration: action.payload.duration,
+        intensity: action.payload.intensity,
         updatedAt: action.payload.endTime,
         syncStatus: 'pending'
       };
@@ -130,17 +141,39 @@ const contractionReducer = (state: ContractionState, action: ContractionAction):
 interface ContractionContextType {
   state: ContractionState;
   startContraction: () => void;
-  stopContraction: () => void;
+  stopContraction: (intensity?: number) => void;
   addManualContraction: (contraction: Omit<Contraction, 'id' | 'createdAt' | 'updatedAt' | 'syncStatus'>) => Promise<void>;
   updateContraction: (id: string, updates: Partial<Contraction>) => Promise<void>;
   deleteContraction: (id: string) => Promise<void>;
+  archiveAllContractions: () => Promise<void>;
   refreshContractions: () => Promise<void>;
+  undo: () => Promise<void>;
+  redo: () => Promise<void>;
+  canUndo: boolean;
+  canRedo: boolean;
+  undoDescription: string | null;
+  redoDescription: string | null;
 }
 
 const ContractionContext = createContext<ContractionContextType | undefined>(undefined);
 
 export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(contractionReducer, initialState);
+  const [historyState, setHistoryState] = useState<HistoryUIState>({
+    canUndo: historyManager.canUndo(),
+    canRedo: historyManager.canRedo(),
+    undoDescription: historyManager.getUndoDescription(),
+    redoDescription: historyManager.getRedoDescription(),
+  });
+
+  const refreshHistoryState = useCallback(() => {
+    setHistoryState({
+      canUndo: historyManager.canUndo(),
+      canRedo: historyManager.canRedo(),
+      undoDescription: historyManager.getUndoDescription(),
+      redoDescription: historyManager.getRedoDescription(),
+    });
+  }, []);
 
   // Load contractions from IndexedDB on mount
   useEffect(() => {
@@ -174,25 +207,36 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     dispatch({ type: 'START_TIMER' });
   }, [state.timerState.isRunning]);
 
-  const stopContraction = useCallback(async () => {
+  const stopContraction = useCallback(async (intensity?: number) => {
     if (!state.timerState.isRunning || !state.activeContraction) return;
 
     const endTime = Date.now();
     const duration = calculateDuration(state.activeContraction.startTime, endTime);
 
-    dispatch({ type: 'STOP_TIMER', payload: { endTime, duration } });
+    dispatch({ type: 'STOP_TIMER', payload: { endTime, duration, intensity } });
 
     // Save to IndexedDB
     const completedContraction: Contraction = {
       ...state.activeContraction,
       endTime,
       duration,
+      intensity,
       updatedAt: endTime,
       syncStatus: 'pending'
     };
 
     try {
       await dbOperations.addContraction(completedContraction);
+
+      // Add to history
+      const timeStr = formatTime(completedContraction.startTime);
+      await historyManager.addEntry(
+        'create',
+        `Created contraction at ${timeStr}`,
+        completedContraction.id,
+        undefined,
+        completedContraction
+      );
     } catch (error) {
       console.error('Failed to save contraction:', error);
     }
@@ -214,6 +258,16 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     try {
       await dbOperations.addContraction(newContraction);
+
+      // Add to history
+      const timeStr = formatTime(newContraction.startTime);
+      await historyManager.addEntry(
+        'create',
+        `Created manual contraction at ${timeStr}`,
+        newContraction.id,
+        undefined,
+        newContraction
+      );
     } catch (error) {
       console.error('Failed to add manual contraction:', error);
       throw error;
@@ -232,15 +286,155 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
   }, []);
 
   const deleteContraction = useCallback(async (id: string) => {
+    const contraction = await dbOperations.getContraction(id);
+    if (!contraction) return;
+
+    // Add to history before deleting
+    const timeStr = formatTime(contraction.startTime);
+    await historyManager.addEntry(
+      'delete',
+      `Deleted contraction at ${timeStr}`,
+      id,
+      undefined,
+      contraction
+    );
+
     dispatch({ type: 'DELETE_CONTRACTION', payload: id });
 
     try {
-      await dbOperations.deleteContraction(id);
+      // Archive instead of physical delete
+      await dbOperations.updateContraction(id, {
+        archived: true,
+        syncStatus: 'pending'
+      });
+      await syncEngine.queueContraction('archive', id, contraction);
+
+      refreshHistoryState();
     } catch (error) {
-      console.error('Failed to delete contraction:', error);
+      console.error('Failed to archive contraction:', error);
       throw error;
     }
-  }, []);
+  }, [refreshHistoryState]);
+
+  const archiveAllContractions = useCallback(async () => {
+    const contractions = state.contractions;
+    if (contractions.length === 0) return;
+
+    try {
+      const contractionIds = contractions.map(c => c.id);
+
+      // Add to history before archiving
+      await historyManager.addEntry(
+        'archive_all',
+        `Archived ${contractions.length} contractions`,
+        undefined,
+        contractionIds,
+        undefined,
+        contractions
+      );
+
+      // Archive all via sync engine
+      await syncEngine.queueArchiveAll(contractionIds);
+
+      // Clear UI
+      dispatch({ type: 'SET_CONTRACTIONS', payload: [] });
+
+      refreshHistoryState();
+    } catch (error) {
+      console.error('Failed to archive all contractions:', error);
+      throw error;
+    }
+  }, [state.contractions, refreshHistoryState]);
+
+  const undo = useCallback(async () => {
+    if (!historyManager.canUndo()) return;
+
+    const entry = historyManager.getUndoEntry();
+    if (!entry) return;
+
+    try {
+      switch (entry.actionType) {
+        case 'create':
+          // Undo create: delete the contraction
+          if (entry.contractionId) {
+            dispatch({ type: 'DELETE_CONTRACTION', payload: entry.contractionId });
+            await dbOperations.deleteContraction(entry.contractionId);
+          }
+          break;
+
+        case 'delete':
+        case 'archive':
+          // Undo delete/archive: restore the contraction
+          if (entry.previousState) {
+            const restored = { ...entry.previousState, archived: false, syncStatus: 'pending' as const };
+            dispatch({ type: 'ADD_CONTRACTION', payload: restored });
+            await dbOperations.updateContraction(restored.id, { archived: false });
+          }
+          break;
+
+        case 'archive_all':
+          // Undo archive all: restore all contractions
+          if (entry.previousStates) {
+            for (const contraction of entry.previousStates) {
+              const restored = { ...contraction, archived: false, syncStatus: 'pending' as const };
+              dispatch({ type: 'ADD_CONTRACTION', payload: restored });
+              await dbOperations.updateContraction(restored.id, { archived: false });
+            }
+          }
+          break;
+      }
+
+      await historyManager.moveUndoPointer();
+      refreshHistoryState();
+    } catch (error) {
+      console.error('Undo failed:', error);
+      throw error;
+    }
+  }, [refreshHistoryState]);
+
+  const redo = useCallback(async () => {
+    if (!historyManager.canRedo()) return;
+
+    const entry = historyManager.getRedoEntry();
+    if (!entry) return;
+
+    try {
+      switch (entry.actionType) {
+        case 'create':
+          // Redo create: re-add the contraction
+          if (entry.previousState) {
+            dispatch({ type: 'ADD_CONTRACTION', payload: entry.previousState });
+            await dbOperations.addContraction(entry.previousState);
+          }
+          break;
+
+        case 'delete':
+        case 'archive':
+          // Redo delete/archive: remove again
+          if (entry.contractionId) {
+            dispatch({ type: 'DELETE_CONTRACTION', payload: entry.contractionId });
+            await dbOperations.updateContraction(entry.contractionId, { archived: true });
+          }
+          break;
+
+        case 'archive_all':
+          // Redo archive all: remove all again
+          if (entry.contractionIds) {
+            for (const id of entry.contractionIds) {
+              dispatch({ type: 'DELETE_CONTRACTION', payload: id });
+              await dbOperations.updateContraction(id, { archived: true });
+            }
+          }
+          break;
+      }
+
+      await historyManager.moveRedoPointer();
+      refreshHistoryState();
+    } catch (error) {
+      console.error('Redo failed:', error);
+      throw error;
+    }
+  }, [refreshHistoryState]);
 
   const refreshContractions = useCallback(async () => {
     try {
@@ -260,7 +454,14 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         addManualContraction,
         updateContraction,
         deleteContraction,
-        refreshContractions
+        archiveAllContractions,
+        refreshContractions,
+        undo,
+        redo,
+        canUndo: historyState.canUndo,
+        canRedo: historyState.canRedo,
+        undoDescription: historyState.undoDescription,
+        redoDescription: historyState.redoDescription,
       }}
     >
       {children}

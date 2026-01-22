@@ -1,9 +1,13 @@
 import { GoogleSheetsConfig } from '../../types/sync';
 
+export type ChartDisplayMode = 'duration' | 'interval' | 'both';
+
 const KEYS = {
   THEME: 'contraction-tracker-theme',
   GOOGLE_SHEETS_CONFIG: 'contraction-tracker-google-sheets-config',
   LAST_SYNC_TIME: 'contraction-tracker-last-sync',
+  INTENSITY_PROMPT_ENABLED: 'contraction-tracker-intensity-prompt-enabled',
+  CHART_DISPLAY_MODE: 'contraction-tracker-chart-display-mode',
 } as const;
 
 // Theme management
@@ -53,6 +57,29 @@ export const getLastSyncTime = (): number | null => {
 
 export const setLastSyncTime = (timestamp: number): void => {
   localStorage.setItem(KEYS.LAST_SYNC_TIME, timestamp.toString());
+};
+
+// Intensity prompt setting
+export const getIntensityPromptEnabled = (): boolean => {
+  const stored = localStorage.getItem(KEYS.INTENSITY_PROMPT_ENABLED);
+  return stored === 'true'; // Default to false if not set
+};
+
+export const setIntensityPromptEnabled = (enabled: boolean): void => {
+  localStorage.setItem(KEYS.INTENSITY_PROMPT_ENABLED, enabled.toString());
+};
+
+// Chart display mode
+export const getChartDisplayMode = (): ChartDisplayMode => {
+  const stored = localStorage.getItem(KEYS.CHART_DISPLAY_MODE);
+  if (stored === 'duration' || stored === 'interval' || stored === 'both') {
+    return stored;
+  }
+  return 'both'; // Default to both charts
+};
+
+export const setChartDisplayMode = (mode: ChartDisplayMode): void => {
+  localStorage.setItem(KEYS.CHART_DISPLAY_MODE, mode);
 };
 
 // Clear all stored data

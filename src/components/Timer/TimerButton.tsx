@@ -1,17 +1,36 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Play, Square } from 'lucide-react';
 import { useContractions } from '../../contexts/ContractionContext';
+import { getIntensityPromptEnabled } from '../../services/storage/localStorage';
+import IntensityPrompt from './IntensityPrompt';
 
 const TimerButton = () => {
   const { state, startContraction, stopContraction } = useContractions();
   const { timerState } = state;
+  const [showIntensityPrompt, setShowIntensityPrompt] = useState(false);
 
   const handleClick = () => {
     if (timerState.isRunning) {
-      stopContraction();
+      // Check if intensity prompt is enabled
+      if (getIntensityPromptEnabled()) {
+        setShowIntensityPrompt(true);
+      } else {
+        stopContraction();
+      }
     } else {
       startContraction();
     }
+  };
+
+  const handleIntensitySubmit = (intensity: number) => {
+    stopContraction(intensity);
+    setShowIntensityPrompt(false);
+  };
+
+  const handleSkip = () => {
+    stopContraction(undefined);
+    setShowIntensityPrompt(false);
   };
 
   return (
@@ -58,6 +77,12 @@ const TimerButton = () => {
           <p className="text-sm">Tap to stop when contraction ends</p>
         </motion.div>
       )}
+
+      <IntensityPrompt
+        isOpen={showIntensityPrompt}
+        onSubmit={handleIntensitySubmit}
+        onSkip={handleSkip}
+      />
     </div>
   );
 };
