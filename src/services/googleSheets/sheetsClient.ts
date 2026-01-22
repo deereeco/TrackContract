@@ -1,6 +1,6 @@
 import { GoogleSheetsConfig } from '../../types/sync';
 import { Contraction } from '../../types/contraction';
-import { contractionToSheetRow, sheetRowToContraction } from './sheetsMapper';
+import { contractionToSheetRow } from './sheetsMapper';
 
 export class GoogleSheetsClient {
   private config: GoogleSheetsConfig;
