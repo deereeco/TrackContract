@@ -14,7 +14,7 @@ import {
   orderBy,
   DocumentData,
 } from 'firebase/firestore';
-import { getFirebaseDb, getFirebaseAuth } from '../../config/firebase';
+import { getFirebaseDb } from '../../config/firebase';
 import { Contraction } from '../../types/contraction';
 import {
   getFirebaseUserId,
