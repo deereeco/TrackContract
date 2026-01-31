@@ -7,9 +7,10 @@ export interface Contraction {
   notes?: string;                // Optional
   createdAt: number;             // Timestamp
   updatedAt: number;             // Timestamp
-  syncStatus: 'synced' | 'pending' | 'conflict';
+  syncStatus?: 'synced' | 'pending' | 'conflict'; // Optional during migration
   syncedAt?: number;             // Last sync time
-  sheetRowId?: number;           // Google Sheet row
+  /** @deprecated Use Firebase instead - only needed for Google Sheets migration */
+  sheetRowId?: number;           // Google Sheet row (deprecated)
   archived?: boolean;            // Soft-deleted/archived
 }
 

@@ -12,6 +12,9 @@ import ContractionChart from './components/Charts/ContractionChart';
 import Settings from './components/Settings/Settings';
 import DebugConsole from './components/Debug/DebugConsole';
 import { checkAndApplyUrlConfig } from './utils/urlConfig';
+import { getSyncBackend } from './services/storage/localStorage';
+import { initializeAuth, checkFirebaseConfig } from './config/firebase';
+import { setUserIdFromShareLink } from './services/firebase/firestoreClient';
 
 type Tab = 'timer' | 'list' | 'chart' | 'settings';
 
@@ -27,6 +30,35 @@ function App() {
       // Hide message after 5 seconds
       setTimeout(() => setShowConfigMessage(false), 5000);
     }
+  }, []);
+
+  // Initialize Firebase and check for share link on mount
+  useEffect(() => {
+    const initializeFirebase = async () => {
+      const backend = getSyncBackend();
+
+      // Check for userId in URL hash (share link)
+      const hash = window.location.hash;
+      const userIdMatch = hash.match(/userId=([^&]+)/);
+      if (userIdMatch) {
+        const userId = userIdMatch[1];
+        setUserIdFromShareLink(userId);
+        // Clean up URL
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+
+      // Initialize Firebase if backend is set to Firebase and config is available
+      if (backend === 'firebase' && checkFirebaseConfig()) {
+        try {
+          await initializeAuth();
+          console.log('Firebase initialized successfully');
+        } catch (error) {
+          console.error('Failed to initialize Firebase:', error);
+        }
+      }
+    };
+
+    initializeFirebase();
   }, []);
 
   return (

@@ -1,10 +1,14 @@
 export type SyncStatus = 'idle' | 'syncing' | 'error' | 'offline';
 
+export type SyncBackend = 'firebase' | 'googleSheets' | 'none';
+
 export interface SyncState {
   status: SyncStatus;
   lastSyncTime: number | null;
   pendingOperations: number;
   error?: string;
+  backend: SyncBackend;
+  realtimeEnabled: boolean;
 }
 
 export interface SyncOperation {
@@ -15,6 +19,15 @@ export interface SyncOperation {
   timestamp: number;
   retryCount: number;
   status: 'pending' | 'processing' | 'failed' | 'completed';
+}
+
+export interface FirebaseConfig {
+  apiKey: string;
+  authDomain: string;
+  projectId: string;
+  storageBucket: string;
+  messagingSenderId: string;
+  appId: string;
 }
 
 export interface GoogleSheetsConfig {

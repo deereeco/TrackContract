@@ -6,6 +6,9 @@ import { calculateDuration } from '../utils/calculations';
 import { syncEngine } from '../services/sync/syncEngine';
 import { historyManager } from '../services/history/historyManager';
 import { formatTime } from '../utils/dateTime';
+import { getSyncBackend } from '../services/storage/localStorage';
+import * as firestoreClient from '../services/firebase/firestoreClient';
+import type { Unsubscribe } from 'firebase/firestore';
 
 interface ContractionState {
   contractions: Contraction[];
@@ -157,6 +160,27 @@ interface ContractionContextType {
 
 const ContractionContext = createContext<ContractionContextType | undefined>(undefined);
 
+/**
+ * Merge local and remote contractions using last-write-wins strategy
+ */
+const mergeContractions = (local: Contraction[], remote: Contraction[]): Contraction[] => {
+  const merged = new Map<string, Contraction>();
+
+  // Add all local contractions
+  local.forEach(c => merged.set(c.id, c));
+
+  // Override with remote if newer
+  remote.forEach(c => {
+    const existing = merged.get(c.id);
+    if (!existing || c.updatedAt > existing.updatedAt) {
+      merged.set(c.id, c);
+    }
+  });
+
+  // Return sorted by startTime descending
+  return Array.from(merged.values()).sort((a, b) => b.startTime - a.startTime);
+};
+
 export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(contractionReducer, initialState);
   const [historyState, setHistoryState] = useState<HistoryUIState>({
@@ -213,6 +237,49 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     return () => window.removeEventListener('sync-completed', handleSyncCompleted);
   }, []);
 
+  // Firebase real-time sync listener
+  useEffect(() => {
+    const backend = getSyncBackend();
+    if (backend !== 'firebase') return;
+
+    let unsubscribe: Unsubscribe | null = null;
+
+    const setupRealtimeSync = async () => {
+      try {
+        unsubscribe = firestoreClient.subscribeToContractions(async (remoteContractions) => {
+          // Get local data
+          const localContractions = await dbOperations.getAllContractions();
+
+          // Merge using last-write-wins
+          const merged = mergeContractions(localContractions, remoteContractions);
+
+          // Update Dexie for offline cache
+          for (const contraction of merged) {
+            const existing = await dbOperations.getContraction(contraction.id);
+            if (!existing) {
+              await dbOperations.addContraction(contraction);
+            } else if (existing.updatedAt < contraction.updatedAt) {
+              await dbOperations.updateContraction(contraction.id, contraction);
+            }
+          }
+
+          // Update UI
+          dispatch({ type: 'SET_CONTRACTIONS', payload: merged });
+        });
+      } catch (error) {
+        console.error('Failed to set up Firebase real-time sync:', error);
+      }
+    };
+
+    setupRealtimeSync();
+
+    return () => {
+      if (unsubscribe) {
+        firestoreClient.unsubscribeFromContractions(unsubscribe);
+      }
+    };
+  }, []);
+
   const startContraction = useCallback(() => {
     if (state.timerState.isRunning) return;
     dispatch({ type: 'START_TIMER' });
@@ -239,8 +306,14 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     try {
       await dbOperations.addContraction(completedContraction);
 
-      // Queue for sync
-      await syncEngine.queueContraction('create', completedContraction.id, completedContraction);
+      const backend = getSyncBackend();
+      if (backend === 'firebase') {
+        // Save to Firebase
+        await firestoreClient.addContraction(completedContraction);
+      } else if (backend === 'googleSheets') {
+        // Queue for Google Sheets sync
+        await syncEngine.queueContraction('create', completedContraction.id, completedContraction);
+      }
 
       // Add to history
       const timeStr = formatTime(completedContraction.startTime);
@@ -273,8 +346,14 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     try {
       await dbOperations.addContraction(newContraction);
 
-      // Queue for sync
-      await syncEngine.queueContraction('create', newContraction.id, newContraction);
+      const backend = getSyncBackend();
+      if (backend === 'firebase') {
+        // Save to Firebase
+        await firestoreClient.addContraction(newContraction);
+      } else if (backend === 'googleSheets') {
+        // Queue for Google Sheets sync
+        await syncEngine.queueContraction('create', newContraction.id, newContraction);
+      }
 
       // Add to history
       const timeStr = formatTime(newContraction.startTime);
@@ -298,9 +377,16 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       const contraction = await dbOperations.getContraction(id);
       await dbOperations.updateContraction(id, updates);
 
-      // Queue for sync if the update is user-facing (not internal sync updates)
+      // Sync if the update is user-facing (not internal sync updates)
       if (contraction && !updates.syncStatus && !updates.syncedAt) {
-        await syncEngine.queueContraction('update', id, { ...contraction, ...updates });
+        const backend = getSyncBackend();
+        if (backend === 'firebase') {
+          // Update in Firebase
+          await firestoreClient.updateContraction(id, updates);
+        } else if (backend === 'googleSheets') {
+          // Queue for Google Sheets sync
+          await syncEngine.queueContraction('update', id, { ...contraction, ...updates });
+        }
       }
     } catch (error) {
       console.error('Failed to update contraction:', error);
@@ -330,7 +416,15 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         archived: true,
         syncStatus: 'pending'
       });
-      await syncEngine.queueContraction('archive', id, contraction);
+
+      const backend = getSyncBackend();
+      if (backend === 'firebase') {
+        // Archive in Firebase
+        await firestoreClient.archiveContraction(id);
+      } else if (backend === 'googleSheets') {
+        // Queue for Google Sheets sync
+        await syncEngine.queueContraction('archive', id, contraction);
+      }
 
       refreshHistoryState();
     } catch (error) {
@@ -356,8 +450,14 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         contractions
       );
 
-      // Archive all via sync engine
-      await syncEngine.queueArchiveAll(contractionIds);
+      const backend = getSyncBackend();
+      if (backend === 'firebase') {
+        // Batch archive in Firebase
+        await firestoreClient.batchArchive(contractionIds);
+      } else if (backend === 'googleSheets') {
+        // Archive all via Google Sheets sync engine
+        await syncEngine.queueArchiveAll(contractionIds);
+      }
 
       // Clear UI
       dispatch({ type: 'SET_CONTRACTIONS', payload: [] });

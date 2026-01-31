@@ -1,4 +1,4 @@
-import { GoogleSheetsConfig } from '../../types/sync';
+import { GoogleSheetsConfig, SyncBackend } from '../../types/sync';
 
 export type ChartDisplayMode = 'duration' | 'interval' | 'both';
 
@@ -8,6 +8,8 @@ const KEYS = {
   LAST_SYNC_TIME: 'contraction-tracker-last-sync',
   INTENSITY_PROMPT_ENABLED: 'contraction-tracker-intensity-prompt-enabled',
   CHART_DISPLAY_MODE: 'contraction-tracker-chart-display-mode',
+  FIREBASE_USER_ID: 'contraction-tracker-firebase-user-id',
+  SYNC_BACKEND: 'contraction-tracker-sync-backend',
 } as const;
 
 // Theme management
@@ -80,6 +82,33 @@ export const getChartDisplayMode = (): ChartDisplayMode => {
 
 export const setChartDisplayMode = (mode: ChartDisplayMode): void => {
   localStorage.setItem(KEYS.CHART_DISPLAY_MODE, mode);
+};
+
+// Firebase user ID management
+export const getFirebaseUserId = (): string | null => {
+  return localStorage.getItem(KEYS.FIREBASE_USER_ID);
+};
+
+export const setFirebaseUserId = (userId: string): void => {
+  localStorage.setItem(KEYS.FIREBASE_USER_ID, userId);
+};
+
+export const clearFirebaseUserId = (): void => {
+  localStorage.removeItem(KEYS.FIREBASE_USER_ID);
+};
+
+// Sync backend management
+export const getSyncBackend = (): SyncBackend => {
+  const stored = localStorage.getItem(KEYS.SYNC_BACKEND);
+  if (stored === 'firebase' || stored === 'googleSheets' || stored === 'none') {
+    return stored;
+  }
+  // Default to 'none' if not set
+  return 'none';
+};
+
+export const setSyncBackend = (backend: SyncBackend): void => {
+  localStorage.setItem(KEYS.SYNC_BACKEND, backend);
 };
 
 // Clear all stored data

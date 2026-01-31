@@ -3,10 +3,14 @@ import { ConflictResolution } from '../../types/sync';
 
 /**
  * Resolve conflicts between local and remote versions using last-write-wins strategy
+ * @param local Local version of the contraction
+ * @param remote Remote version of the contraction
+ * @param preferServer When true, prefer server (remote) on equal timestamps (for Firebase)
  */
 export const resolveConflict = (
   local: Contraction,
-  remote: Contraction
+  remote: Contraction,
+  preferServer: boolean = false
 ): ConflictResolution => {
   // Last-write-wins based on updatedAt timestamp
   if (local.updatedAt > remote.updatedAt) {
@@ -24,7 +28,17 @@ export const resolveConflict = (
       strategy: 'remote',
     };
   } else {
-    // Same timestamp, prefer local
+    // Same timestamp - when using Firebase, prefer server timestamp
+    if (preferServer) {
+      return {
+        localVersion: local,
+        remoteVersion: remote,
+        resolvedVersion: remote,
+        strategy: 'remote',
+      };
+    }
+
+    // For Google Sheets or local-only, prefer local
     return {
       localVersion: local,
       remoteVersion: remote,
@@ -36,10 +50,14 @@ export const resolveConflict = (
 
 /**
  * Merge two arrays of contractions, resolving conflicts
+ * @param local Local contractions
+ * @param remote Remote contractions
+ * @param preferServer When true, prefer server on equal timestamps (for Firebase)
  */
 export const mergeContractions = (
   local: Contraction[],
-  remote: Contraction[]
+  remote: Contraction[],
+  preferServer: boolean = false
 ): Contraction[] => {
   const merged = new Map<string, Contraction>();
 
@@ -60,7 +78,7 @@ export const mergeContractions = (
       });
     } else {
       // Conflict resolution
-      const resolution = resolveConflict(localContraction, remoteContraction);
+      const resolution = resolveConflict(localContraction, remoteContraction, preferServer);
       merged.set(remoteContraction.id, {
         ...resolution.resolvedVersion,
         syncStatus: 'synced',

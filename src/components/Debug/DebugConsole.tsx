@@ -60,7 +60,7 @@ const DebugConsole = () => {
   // Show console with 4 taps on bottom-right corner
   useEffect(() => {
     let tapCount = 0;
-    let tapTimer: number;
+    let tapTimer: ReturnType<typeof setTimeout>;
 
     const handleTap = (e: TouchEvent) => {
       const x = e.touches[0].clientX;

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { SyncState } from '../types/sync';
-import { getLastSyncTime, setLastSyncTime } from '../services/storage/localStorage';
+import { SyncState, SyncBackend } from '../types/sync';
+import { getLastSyncTime, setLastSyncTime, getSyncBackend } from '../services/storage/localStorage';
 import { syncEngine } from '../services/sync/syncEngine';
 
 interface SyncContextType {
@@ -13,10 +13,13 @@ const SyncContext = createContext<SyncContextType | undefined>(undefined);
 
 export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [backend] = useState<SyncBackend>(getSyncBackend());
   const [syncState, setSyncState] = useState<SyncState>({
     status: 'idle',
     lastSyncTime: getLastSyncTime(),
-    pendingOperations: 0
+    pendingOperations: 0,
+    backend: getSyncBackend(),
+    realtimeEnabled: getSyncBackend() === 'firebase',
   });
 
   // Monitor online/offline status
@@ -66,7 +69,9 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSyncState({
         status: 'idle',
         lastSyncTime: now,
-        pendingOperations: pendingCount
+        pendingOperations: pendingCount,
+        backend: getSyncBackend(),
+        realtimeEnabled: getSyncBackend() === 'firebase',
       });
 
       // Dispatch event so other components can refresh their data
@@ -88,16 +93,27 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []); // Run once on mount
 
-  // Background sync every 60 seconds when online
+  // Background sync every 60 seconds when online (only for Google Sheets)
   useEffect(() => {
-    if (!isOnline) return;
+    // Firebase uses real-time sync, no polling needed
+    if (backend === 'firebase') {
+      setSyncState(prev => ({
+        ...prev,
+        status: 'idle',
+        realtimeEnabled: true,
+      }));
+      return;
+    }
 
-    const interval = setInterval(() => {
-      triggerSync();
-    }, 60000); // 60 seconds
+    // Google Sheets: poll every 60 seconds
+    if (backend === 'googleSheets' && isOnline) {
+      const interval = setInterval(() => {
+        triggerSync();
+      }, 60000); // 60 seconds
 
-    return () => clearInterval(interval);
-  }, [isOnline, triggerSync]);
+      return () => clearInterval(interval);
+    }
+  }, [backend, isOnline, triggerSync]);
 
   return (
     <SyncContext.Provider value={{ syncState, triggerSync, isOnline }}>
