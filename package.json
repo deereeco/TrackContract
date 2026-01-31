@@ -10,8 +10,6 @@
     "deploy": "npm run build && gh-pages -d dist"
   },
   "dependencies": {
-    "dexie": "^3.2.4",
-    "dexie-react-hooks": "^1.1.7",
     "firebase": "^10.14.1",
     "framer-motion": "^10.16.16",
     "lucide-react": "^0.303.0",

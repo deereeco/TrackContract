@@ -1,9 +1,8 @@
 import { v4 as uuidv4 } from 'uuid';
 import { HistoryEntry, HistoryState, HistoryActionType } from '../../types/history';
 import { Contraction } from '../../types/contraction';
-import { dbOperations } from '../storage/db';
+import { getHistoryEntries, setHistoryEntries, getHistoryPointer, setHistoryPointer, clearHistory as clearHistoryStorage } from '../storage/localStorage';
 
-const HISTORY_STORAGE_KEY = 'contraction-tracker-history';
 const MAX_HISTORY_SIZE = 50;
 
 export class HistoryManager {
@@ -19,19 +18,15 @@ export class HistoryManager {
   }
 
   /**
-   * Load history from localStorage and IndexedDB
+   * Load history from localStorage
    */
-  private async loadFromLocalStorage() {
+  private loadFromLocalStorage() {
     try {
-      const stored = localStorage.getItem(HISTORY_STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        this.state.currentIndex = parsed.currentIndex || -1;
-      }
+      const entries = getHistoryEntries();
+      const currentIndex = getHistoryPointer();
 
-      // Load entries from IndexedDB
-      const entries = await dbOperations.getAllHistory();
       this.state.entries = entries;
+      this.state.currentIndex = currentIndex;
     } catch (error) {
       console.error('Failed to load history:', error);
     }
@@ -40,19 +35,10 @@ export class HistoryManager {
   /**
    * Save history state to localStorage
    */
-  private async saveToLocalStorage() {
+  private saveToLocalStorage() {
     try {
-      // Save pointer to localStorage
-      localStorage.setItem(
-        HISTORY_STORAGE_KEY,
-        JSON.stringify({ currentIndex: this.state.currentIndex })
-      );
-
-      // Save entries to IndexedDB
-      await dbOperations.clearHistory();
-      for (const entry of this.state.entries) {
-        await dbOperations.addHistoryEntry(entry);
-      }
+      setHistoryEntries(this.state.entries);
+      setHistoryPointer(this.state.currentIndex);
     } catch (error) {
       console.error('Failed to save history:', error);
     }
@@ -96,7 +82,7 @@ export class HistoryManager {
       this.state.currentIndex--;
     }
 
-    await this.saveToLocalStorage();
+    this.saveToLocalStorage();
   }
 
   /**
@@ -135,7 +121,7 @@ export class HistoryManager {
   async moveUndoPointer(): Promise<void> {
     if (this.canUndo()) {
       this.state.currentIndex--;
-      await this.saveToLocalStorage();
+      this.saveToLocalStorage();
     }
   }
 
@@ -145,7 +131,7 @@ export class HistoryManager {
   async moveRedoPointer(): Promise<void> {
     if (this.canRedo()) {
       this.state.currentIndex++;
-      await this.saveToLocalStorage();
+      this.saveToLocalStorage();
     }
   }
 
@@ -171,7 +157,7 @@ export class HistoryManager {
   async clear(): Promise<void> {
     this.state.entries = [];
     this.state.currentIndex = -1;
-    await this.saveToLocalStorage();
+    clearHistoryStorage();
   }
 
   /**

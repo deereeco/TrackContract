@@ -1,4 +1,5 @@
 import { GoogleSheetsConfig, SyncBackend } from '../../types/sync';
+import { HistoryEntry } from '../../types/history';
 
 export type ChartDisplayMode = 'duration' | 'interval' | 'both';
 
@@ -10,6 +11,8 @@ const KEYS = {
   CHART_DISPLAY_MODE: 'contraction-tracker-chart-display-mode',
   FIREBASE_USER_ID: 'contraction-tracker-firebase-user-id',
   SYNC_BACKEND: 'contraction-tracker-sync-backend',
+  HISTORY_ENTRIES: 'contraction-tracker-history-entries',
+  HISTORY_POINTER: 'contraction-tracker-history-pointer',
 } as const;
 
 // Theme management
@@ -109,6 +112,35 @@ export const getSyncBackend = (): SyncBackend => {
 
 export const setSyncBackend = (backend: SyncBackend): void => {
   localStorage.setItem(KEYS.SYNC_BACKEND, backend);
+};
+
+// History management
+export const getHistoryEntries = (): HistoryEntry[] => {
+  const stored = localStorage.getItem(KEYS.HISTORY_ENTRIES);
+  if (!stored) return [];
+  try {
+    return JSON.parse(stored);
+  } catch {
+    return [];
+  }
+};
+
+export const setHistoryEntries = (entries: HistoryEntry[]): void => {
+  localStorage.setItem(KEYS.HISTORY_ENTRIES, JSON.stringify(entries));
+};
+
+export const getHistoryPointer = (): number => {
+  const stored = localStorage.getItem(KEYS.HISTORY_POINTER);
+  return stored ? parseInt(stored, 10) : -1;
+};
+
+export const setHistoryPointer = (pointer: number): void => {
+  localStorage.setItem(KEYS.HISTORY_POINTER, pointer.toString());
+};
+
+export const clearHistory = (): void => {
+  localStorage.removeItem(KEYS.HISTORY_ENTRIES);
+  localStorage.removeItem(KEYS.HISTORY_POINTER);
 };
 
 // Clear all stored data

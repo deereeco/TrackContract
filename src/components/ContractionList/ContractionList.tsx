@@ -9,6 +9,7 @@ const ContractionList = () => {
   const {
     state,
     archiveAllContractions,
+    refreshContractions,
     undo,
     redo,
     canUndo,
@@ -17,13 +18,13 @@ const ContractionList = () => {
     redoDescription
   } = useContractions();
   const { contractions, loading } = state;
-  const { syncState, triggerSync } = useSync();
+  const { syncState } = useSync();
   const [showForm, setShowForm] = useState(false);
 
   const handleArchiveAll = async () => {
     const confirmed = window.confirm(
       `Archive all ${contractions.length} contractions?\n` +
-      'They will be moved to the "Archived Contractions" sheet in Google Sheets.'
+      'They will be hidden from the list but can be restored with Undo.'
     );
 
     if (confirmed) {
@@ -84,13 +85,12 @@ const ContractionList = () => {
             Redo
           </button>
           <button
-            onClick={triggerSync}
-            disabled={syncState.status === 'syncing'}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-900 dark:text-white rounded-lg transition-colors disabled:opacity-50"
-            title="Sync now"
+            onClick={refreshContractions}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-900 dark:text-white rounded-lg transition-colors"
+            title="Refresh data"
           >
-            <RefreshCw className={`w-5 h-5 ${syncState.status === 'syncing' ? 'animate-spin' : ''}`} />
-            Sync To Google Sheet
+            <RefreshCw className="w-5 h-5" />
+            Refresh
           </button>
           <button
             onClick={() => setShowForm(true)}
@@ -102,16 +102,10 @@ const ContractionList = () => {
         </div>
       </div>
 
-      {syncState.pendingOperations > 0 && (
-        <div className="text-sm text-slate-600 dark:text-slate-400 flex items-center gap-2">
+      {syncState.realtimeEnabled && (
+        <div className="text-sm text-green-600 dark:text-green-400 flex items-center gap-2">
           <RefreshCw className="w-4 h-4" />
-          {syncState.pendingOperations} contraction{syncState.pendingOperations !== 1 ? 's' : ''} pending sync
-        </div>
-      )}
-
-      {syncState.status === 'error' && syncState.error && (
-        <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg">
-          Sync error: {syncState.error}
+          Real-time sync active
         </div>
       )}
 
@@ -132,7 +126,7 @@ const ContractionList = () => {
           Archive All Contractions
         </button>
         <p className="text-xs text-slate-600 dark:text-slate-400 mt-2">
-          Moves all contractions to the "Archived Contractions" sheet in Google Sheets
+          Archives all contractions (hides them from the list)
         </p>
       </div>
 

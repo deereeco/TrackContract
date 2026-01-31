@@ -1,9 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect, useCallback, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { Contraction, TimerState } from '../types/contraction';
-import { dbOperations } from '../services/storage/db';
 import { calculateDuration } from '../utils/calculations';
-import { syncEngine } from '../services/sync/syncEngine';
 import { historyManager } from '../services/history/historyManager';
 import { formatTime } from '../utils/dateTime';
 import { getSyncBackend } from '../services/storage/localStorage';
@@ -160,27 +158,6 @@ interface ContractionContextType {
 
 const ContractionContext = createContext<ContractionContextType | undefined>(undefined);
 
-/**
- * Merge local and remote contractions using last-write-wins strategy
- */
-const mergeContractions = (local: Contraction[], remote: Contraction[]): Contraction[] => {
-  const merged = new Map<string, Contraction>();
-
-  // Add all local contractions
-  local.forEach(c => merged.set(c.id, c));
-
-  // Override with remote if newer
-  remote.forEach(c => {
-    const existing = merged.get(c.id);
-    if (!existing || c.updatedAt > existing.updatedAt) {
-      merged.set(c.id, c);
-    }
-  });
-
-  // Return sorted by startTime descending
-  return Array.from(merged.values()).sort((a, b) => b.startTime - a.startTime);
-};
-
 export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(contractionReducer, initialState);
   const [historyState, setHistoryState] = useState<HistoryUIState>({
@@ -199,12 +176,20 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     });
   }, []);
 
-  // Load contractions from IndexedDB on mount
+  // Load contractions on mount based on backend
   useEffect(() => {
     const loadContractions = async () => {
       try {
-        const contractions = await dbOperations.getAllContractions();
-        dispatch({ type: 'SET_CONTRACTIONS', payload: contractions });
+        const backend = getSyncBackend();
+
+        if (backend === 'firebase') {
+          // Load from Firebase (already cached offline by Firebase)
+          const contractions = await firestoreClient.getAllContractions();
+          dispatch({ type: 'SET_CONTRACTIONS', payload: contractions });
+        } else {
+          // Local-only mode: no persistence, just empty state
+          dispatch({ type: 'SET_LOADING', payload: false });
+        }
       } catch (error) {
         console.error('Failed to load contractions:', error);
         dispatch({ type: 'SET_LOADING', payload: false });
@@ -226,17 +211,6 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     return () => clearInterval(interval);
   }, [state.timerState.isRunning, state.timerState.startTime]);
 
-  // Listen for sync completion and refresh contractions
-  useEffect(() => {
-    const handleSyncCompleted = async () => {
-      const contractions = await dbOperations.getAllContractions();
-      dispatch({ type: 'SET_CONTRACTIONS', payload: contractions });
-    };
-
-    window.addEventListener('sync-completed', handleSyncCompleted);
-    return () => window.removeEventListener('sync-completed', handleSyncCompleted);
-  }, []);
-
   // Firebase real-time sync listener
   useEffect(() => {
     const backend = getSyncBackend();
@@ -246,25 +220,9 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     const setupRealtimeSync = async () => {
       try {
-        unsubscribe = firestoreClient.subscribeToContractions(async (remoteContractions) => {
-          // Get local data
-          const localContractions = await dbOperations.getAllContractions();
-
-          // Merge using last-write-wins
-          const merged = mergeContractions(localContractions, remoteContractions);
-
-          // Update Dexie for offline cache
-          for (const contraction of merged) {
-            const existing = await dbOperations.getContraction(contraction.id);
-            if (!existing) {
-              await dbOperations.addContraction(contraction);
-            } else if (existing.updatedAt < contraction.updatedAt) {
-              await dbOperations.updateContraction(contraction.id, contraction);
-            }
-          }
-
-          // Update UI
-          dispatch({ type: 'SET_CONTRACTIONS', payload: merged });
+        unsubscribe = firestoreClient.subscribeToContractions((remoteContractions) => {
+          // Firebase handles merging, just update UI
+          dispatch({ type: 'SET_CONTRACTIONS', payload: remoteContractions });
         });
       } catch (error) {
         console.error('Failed to set up Firebase real-time sync:', error);
@@ -291,9 +249,6 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     const endTime = Date.now();
     const duration = calculateDuration(state.activeContraction.startTime, endTime);
 
-    dispatch({ type: 'STOP_TIMER', payload: { endTime, duration, intensity } });
-
-    // Save to IndexedDB
     const completedContraction: Contraction = {
       ...state.activeContraction,
       endTime,
@@ -303,16 +258,14 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       syncStatus: 'pending'
     };
 
-    try {
-      await dbOperations.addContraction(completedContraction);
+    // Update UI immediately (optimistic)
+    dispatch({ type: 'STOP_TIMER', payload: { endTime, duration, intensity } });
 
+    try {
       const backend = getSyncBackend();
       if (backend === 'firebase') {
-        // Save to Firebase
+        // Save to Firebase (offline persistence handles caching)
         await firestoreClient.addContraction(completedContraction);
-      } else if (backend === 'googleSheets') {
-        // Queue for Google Sheets sync
-        await syncEngine.queueContraction('create', completedContraction.id, completedContraction);
       }
 
       // Add to history
@@ -324,10 +277,11 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         undefined,
         completedContraction
       );
+      refreshHistoryState();
     } catch (error) {
       console.error('Failed to save contraction:', error);
     }
-  }, [state.timerState.isRunning, state.activeContraction]);
+  }, [state.timerState.isRunning, state.activeContraction, refreshHistoryState]);
 
   const addManualContraction = useCallback(async (
     contraction: Omit<Contraction, 'id' | 'createdAt' | 'updatedAt' | 'syncStatus'>
@@ -341,18 +295,14 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       syncStatus: 'pending'
     };
 
+    // Update UI immediately (optimistic)
     dispatch({ type: 'ADD_CONTRACTION', payload: newContraction });
 
     try {
-      await dbOperations.addContraction(newContraction);
-
       const backend = getSyncBackend();
       if (backend === 'firebase') {
         // Save to Firebase
         await firestoreClient.addContraction(newContraction);
-      } else if (backend === 'googleSheets') {
-        // Queue for Google Sheets sync
-        await syncEngine.queueContraction('create', newContraction.id, newContraction);
       }
 
       // Add to history
@@ -364,38 +314,40 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         undefined,
         newContraction
       );
+      refreshHistoryState();
     } catch (error) {
       console.error('Failed to add manual contraction:', error);
+      // Revert UI on error
+      dispatch({ type: 'DELETE_CONTRACTION', payload: newContraction.id });
       throw error;
     }
-  }, []);
+  }, [refreshHistoryState]);
 
   const updateContraction = useCallback(async (id: string, updates: Partial<Contraction>) => {
+    // Find the contraction before updating
+    const contraction = state.contractions.find(c => c.id === id);
+
+    // Update UI immediately (optimistic)
     dispatch({ type: 'UPDATE_CONTRACTION', payload: { id, updates } });
 
     try {
-      const contraction = await dbOperations.getContraction(id);
-      await dbOperations.updateContraction(id, updates);
-
-      // Sync if the update is user-facing (not internal sync updates)
-      if (contraction && !updates.syncStatus && !updates.syncedAt) {
-        const backend = getSyncBackend();
-        if (backend === 'firebase') {
-          // Update in Firebase
-          await firestoreClient.updateContraction(id, updates);
-        } else if (backend === 'googleSheets') {
-          // Queue for Google Sheets sync
-          await syncEngine.queueContraction('update', id, { ...contraction, ...updates });
-        }
+      const backend = getSyncBackend();
+      if (backend === 'firebase') {
+        // Update in Firebase
+        await firestoreClient.updateContraction(id, updates);
       }
     } catch (error) {
       console.error('Failed to update contraction:', error);
+      // Revert UI on error
+      if (contraction) {
+        dispatch({ type: 'UPDATE_CONTRACTION', payload: { id, updates: contraction } });
+      }
       throw error;
     }
-  }, []);
+  }, [state.contractions]);
 
   const deleteContraction = useCallback(async (id: string) => {
-    const contraction = await dbOperations.getContraction(id);
+    const contraction = state.contractions.find(c => c.id === id);
     if (!contraction) return;
 
     // Add to history before deleting
@@ -408,30 +360,24 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       contraction
     );
 
+    // Update UI immediately (optimistic)
     dispatch({ type: 'DELETE_CONTRACTION', payload: id });
 
     try {
-      // Archive instead of physical delete
-      await dbOperations.updateContraction(id, {
-        archived: true,
-        syncStatus: 'pending'
-      });
-
       const backend = getSyncBackend();
       if (backend === 'firebase') {
         // Archive in Firebase
         await firestoreClient.archiveContraction(id);
-      } else if (backend === 'googleSheets') {
-        // Queue for Google Sheets sync
-        await syncEngine.queueContraction('archive', id, contraction);
       }
 
       refreshHistoryState();
     } catch (error) {
       console.error('Failed to archive contraction:', error);
+      // Revert UI on error
+      dispatch({ type: 'ADD_CONTRACTION', payload: contraction });
       throw error;
     }
-  }, [refreshHistoryState]);
+  }, [state.contractions, refreshHistoryState]);
 
   const archiveAllContractions = useCallback(async () => {
     const contractions = state.contractions;
@@ -454,9 +400,6 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       if (backend === 'firebase') {
         // Batch archive in Firebase
         await firestoreClient.batchArchive(contractionIds);
-      } else if (backend === 'googleSheets') {
-        // Archive all via Google Sheets sync engine
-        await syncEngine.queueArchiveAll(contractionIds);
       }
 
       // Clear UI
@@ -476,12 +419,16 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     if (!entry) return;
 
     try {
+      const backend = getSyncBackend();
+
       switch (entry.actionType) {
         case 'create':
           // Undo create: delete the contraction
           if (entry.contractionId) {
             dispatch({ type: 'DELETE_CONTRACTION', payload: entry.contractionId });
-            await dbOperations.deleteContraction(entry.contractionId);
+            if (backend === 'firebase') {
+              await firestoreClient.archiveContraction(entry.contractionId);
+            }
           }
           break;
 
@@ -491,7 +438,9 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
           if (entry.previousState) {
             const restored = { ...entry.previousState, archived: false, syncStatus: 'pending' as const };
             dispatch({ type: 'ADD_CONTRACTION', payload: restored });
-            await dbOperations.updateContraction(restored.id, { archived: false });
+            if (backend === 'firebase') {
+              await firestoreClient.updateContraction(restored.id, { archived: false });
+            }
           }
           break;
 
@@ -501,7 +450,9 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
             for (const contraction of entry.previousStates) {
               const restored = { ...contraction, archived: false, syncStatus: 'pending' as const };
               dispatch({ type: 'ADD_CONTRACTION', payload: restored });
-              await dbOperations.updateContraction(restored.id, { archived: false });
+              if (backend === 'firebase') {
+                await firestoreClient.updateContraction(restored.id, { archived: false });
+              }
             }
           }
           break;
@@ -522,12 +473,16 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     if (!entry) return;
 
     try {
+      const backend = getSyncBackend();
+
       switch (entry.actionType) {
         case 'create':
           // Redo create: re-add the contraction
           if (entry.previousState) {
             dispatch({ type: 'ADD_CONTRACTION', payload: entry.previousState });
-            await dbOperations.addContraction(entry.previousState);
+            if (backend === 'firebase') {
+              await firestoreClient.addContraction(entry.previousState);
+            }
           }
           break;
 
@@ -536,7 +491,9 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
           // Redo delete/archive: remove again
           if (entry.contractionId) {
             dispatch({ type: 'DELETE_CONTRACTION', payload: entry.contractionId });
-            await dbOperations.updateContraction(entry.contractionId, { archived: true });
+            if (backend === 'firebase') {
+              await firestoreClient.archiveContraction(entry.contractionId);
+            }
           }
           break;
 
@@ -545,7 +502,9 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
           if (entry.contractionIds) {
             for (const id of entry.contractionIds) {
               dispatch({ type: 'DELETE_CONTRACTION', payload: id });
-              await dbOperations.updateContraction(id, { archived: true });
+              if (backend === 'firebase') {
+                await firestoreClient.archiveContraction(id);
+              }
             }
           }
           break;
@@ -561,8 +520,11 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   const refreshContractions = useCallback(async () => {
     try {
-      const contractions = await dbOperations.getAllContractions();
-      dispatch({ type: 'SET_CONTRACTIONS', payload: contractions });
+      const backend = getSyncBackend();
+      if (backend === 'firebase') {
+        const contractions = await firestoreClient.getAllContractions();
+        dispatch({ type: 'SET_CONTRACTIONS', payload: contractions });
+      }
     } catch (error) {
       console.error('Failed to refresh contractions:', error);
     }
