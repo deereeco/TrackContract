@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircle, Share2, Copy, Cloud, HardDrive } from 'lucide-react';
+import { CheckCircle, Share2, Copy, Cloud, HardDrive, Download } from 'lucide-react';
 import {
   getSyncBackend,
   setSyncBackend,
 } from '../../services/storage/localStorage';
 import { checkFirebaseConfig } from '../../config/firebase';
-import { getShareLink, getUserId } from '../../services/firebase/firestoreClient';
+import { getShareLink, getUserId, getAllContractions } from '../../services/firebase/firestoreClient';
 import type { SyncBackend } from '../../types/sync';
 
 const Settings = () => {
@@ -63,6 +63,58 @@ const Settings = () => {
       setTimeout(() => setShowCopySuccess(false), 2000);
     } catch (error) {
       alert('Failed to copy link. Please copy manually.');
+    }
+  };
+
+  const handleExportData = async () => {
+    try {
+      if (backend !== 'firebase') {
+        alert('Export is only available when using Firebase backend.');
+        return;
+      }
+
+      // Get all contractions from Firebase
+      const contractions = await getAllContractions();
+
+      if (contractions.length === 0) {
+        alert('No contractions to export.');
+        return;
+      }
+
+      // Create export object
+      const exportData = {
+        exportDate: new Date().toISOString(),
+        userId: getUserId(),
+        contractionCount: contractions.length,
+        contractions: contractions.map(c => ({
+          id: c.id,
+          startTime: new Date(c.startTime).toISOString(),
+          endTime: c.endTime ? new Date(c.endTime).toISOString() : null,
+          duration: c.duration,
+          intensity: c.intensity,
+          notes: c.notes,
+          createdAt: new Date(c.createdAt).toISOString(),
+        }))
+      };
+
+      // Convert to JSON
+      const jsonString = JSON.stringify(exportData, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+
+      // Download file
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `contractions-export-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      alert(`Successfully exported ${contractions.length} contractions!`);
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('Failed to export data. Please try again.');
     }
   };
 
@@ -192,6 +244,19 @@ const Settings = () => {
           <div className="flex items-center gap-2 px-4 py-3 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-lg">
             <CheckCircle className="w-5 h-5" />
             <span className="text-sm font-medium">Real-time sync active</span>
+          </div>
+
+          <div>
+            <button
+              onClick={handleExportData}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+            >
+              <Download className="w-5 h-5" />
+              Export Data to JSON
+            </button>
+            <p className="text-xs text-slate-600 dark:text-slate-400 mt-2">
+              Download all your contraction data as a JSON file for backup or analysis.
+            </p>
           </div>
         </div>
       )}
