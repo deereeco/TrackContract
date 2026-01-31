@@ -1,9 +1,9 @@
 import { initializeApp, FirebaseApp } from 'firebase/app';
 import {
-  getFirestore,
+  initializeFirestore,
   Firestore,
-  enableIndexedDbPersistence,
-  enableMultiTabIndexedDbPersistence,
+  persistentLocalCache,
+  persistentMultipleTabManager,
 } from 'firebase/firestore';
 import { getAuth, Auth, signInAnonymously } from 'firebase/auth';
 import { firebaseConfig } from './firebaseConfig';
@@ -31,7 +31,6 @@ const isFirebaseConfigured = (): boolean => {
 let app: FirebaseApp | null = null;
 let db: Firestore | null = null;
 let auth: Auth | null = null;
-let persistenceEnabled = false;
 
 /**
  * Get or initialize Firebase app
@@ -51,19 +50,21 @@ export const getFirebaseApp = (): FirebaseApp => {
 };
 
 /**
- * Get or initialize Firestore instance
+ * Get or initialize Firestore instance with offline persistence
+ * Uses the modern cache configuration (not deprecated APIs)
  */
 export const getFirebaseDb = (): Firestore => {
   if (!db) {
     const firebaseApp = getFirebaseApp();
-    db = getFirestore(firebaseApp);
 
-    // Enable offline persistence (only once)
-    if (!persistenceEnabled) {
-      enableOfflinePersistence().catch((error) => {
-        console.warn('Failed to enable Firestore offline persistence:', error);
-      });
-    }
+    // Initialize Firestore with persistent cache and multi-tab support
+    db = initializeFirestore(firebaseApp, {
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager()
+      })
+    });
+
+    console.log('Firestore initialized with multi-tab persistent cache');
   }
 
   return db;
@@ -79,38 +80,6 @@ export const getFirebaseAuth = (): Auth => {
   }
 
   return auth;
-};
-
-/**
- * Enable offline persistence for Firestore
- * Uses multi-tab persistence if available, falls back to single-tab
- */
-const enableOfflinePersistence = async (): Promise<void> => {
-  if (persistenceEnabled || !db) return;
-
-  try {
-    // Try multi-tab persistence first
-    await enableMultiTabIndexedDbPersistence(db);
-    persistenceEnabled = true;
-    console.log('Firestore multi-tab offline persistence enabled');
-  } catch (error: any) {
-    if (error?.code === 'failed-precondition') {
-      // Multiple tabs open, fallback to single-tab
-      console.warn('Multiple tabs open, using single-tab persistence');
-      try {
-        await enableIndexedDbPersistence(db);
-        persistenceEnabled = true;
-        console.log('Firestore single-tab offline persistence enabled');
-      } catch (err) {
-        console.error('Failed to enable single-tab persistence:', err);
-      }
-    } else if (error?.code === 'unimplemented') {
-      // Browser doesn't support persistence
-      console.warn('Browser does not support offline persistence');
-    } else {
-      console.error('Unexpected error enabling persistence:', error);
-    }
-  }
 };
 
 /**
