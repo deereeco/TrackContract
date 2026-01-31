@@ -14,7 +14,7 @@ import {
   orderBy,
   DocumentData,
 } from 'firebase/firestore';
-import { getFirebaseDb } from '../../config/firebase';
+import { getFirebaseDb, getFirebaseAuth } from '../../config/firebase';
 import { Contraction } from '../../types/contraction';
 import {
   getFirebaseUserId,
@@ -24,17 +24,27 @@ import {
 /**
  * Get or create userId for Firestore
  * This userId is used to isolate user data and enable link sharing
+ * IMPORTANT: Uses Firebase Auth UID to match security rules
  */
 export const getUserId = (): string => {
-  let userId = getFirebaseUserId();
+  const auth = getFirebaseAuth();
 
-  if (!userId) {
-    // Generate a new userId (UUID v4)
-    userId = crypto.randomUUID();
-    setFirebaseUserId(userId);
+  // Use the Firebase Auth user ID if available
+  if (auth.currentUser) {
+    const userId = auth.currentUser.uid;
+    setFirebaseUserId(userId); // Sync to localStorage
+    return userId;
   }
 
-  return userId;
+  // Fallback to localStorage (for before auth completes)
+  let userId = getFirebaseUserId();
+  if (userId) {
+    return userId;
+  }
+
+  // This shouldn't happen if auth is properly initialized
+  console.warn('getUserId called before authentication completed');
+  return '';
 };
 
 /**
@@ -67,8 +77,8 @@ const documentToContraction = (doc: DocumentData): Contraction => {
     startTime: timestampToNumber(data.startTime),
     endTime: data.endTime ? timestampToNumber(data.endTime) : null,
     duration: data.duration ?? null,
-    intensity: data.intensity,
-    notes: data.notes,
+    intensity: data.intensity ?? undefined,
+    notes: data.notes ?? undefined,
     createdAt: timestampToNumber(data.createdAt),
     updatedAt: timestampToNumber(data.updatedAt),
     syncStatus: 'synced', // Always synced if coming from Firestore
@@ -79,18 +89,27 @@ const documentToContraction = (doc: DocumentData): Contraction => {
 
 /**
  * Convert Contraction object to Firestore document data
+ * Filters out undefined values (Firestore doesn't support undefined)
  */
 const contractionToDocument = (contraction: Contraction): any => {
-  return {
+  const doc: any = {
     startTime: contraction.startTime,
     endTime: contraction.endTime,
     duration: contraction.duration,
-    intensity: contraction.intensity,
-    notes: contraction.notes,
     createdAt: contraction.createdAt,
     updatedAt: contraction.updatedAt,
     archived: contraction.archived ?? false,
   };
+
+  // Only include optional fields if they're defined
+  if (contraction.intensity !== undefined) {
+    doc.intensity = contraction.intensity;
+  }
+  if (contraction.notes !== undefined) {
+    doc.notes = contraction.notes;
+  }
+
+  return doc;
 };
 
 /**
