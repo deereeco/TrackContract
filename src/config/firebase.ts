@@ -6,20 +6,16 @@ import {
   enableMultiTabIndexedDbPersistence,
 } from 'firebase/firestore';
 import { getAuth, Auth, signInAnonymously } from 'firebase/auth';
-
-// Firebase configuration from environment variables
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-};
+import { firebaseConfig } from './firebaseConfig';
 
 // Validate Firebase config
 const isFirebaseConfigured = (): boolean => {
-  return !!(
+  // Check if the placeholder values have been replaced
+  const hasPlaceholders =
+    firebaseConfig.apiKey?.includes('YOUR_') ||
+    firebaseConfig.projectId?.includes('YOUR_');
+
+  const hasAllValues = !!(
     firebaseConfig.apiKey &&
     firebaseConfig.authDomain &&
     firebaseConfig.projectId &&
@@ -27,6 +23,8 @@ const isFirebaseConfigured = (): boolean => {
     firebaseConfig.messagingSenderId &&
     firebaseConfig.appId
   );
+
+  return hasAllValues && !hasPlaceholders;
 };
 
 // Initialize Firebase (lazy initialization)
@@ -41,7 +39,7 @@ let persistenceEnabled = false;
 export const getFirebaseApp = (): FirebaseApp => {
   if (!isFirebaseConfigured()) {
     throw new Error(
-      'Firebase is not configured. Please add Firebase credentials to .env file.'
+      'Firebase is not configured. Please update src/config/firebaseConfig.ts with your Firebase credentials.'
     );
   }
 
