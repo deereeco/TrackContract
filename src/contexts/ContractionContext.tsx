@@ -183,9 +183,24 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         const backend = getSyncBackend();
 
         if (backend === 'firebase') {
-          // Load from Firebase (already cached offline by Firebase)
-          const contractions = await firestoreClient.getAllContractions();
-          dispatch({ type: 'SET_CONTRACTIONS', payload: contractions });
+          // Wait for auth to be ready before loading
+          const auth = await import('../config/firebase').then(m => m.getFirebaseAuth());
+
+          // Wait for auth to initialize (max 5 seconds)
+          let attempts = 0;
+          while (!auth.currentUser && attempts < 50) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            attempts++;
+          }
+
+          if (auth.currentUser) {
+            // Load from Firebase (already cached offline by Firebase)
+            const contractions = await firestoreClient.getAllContractions();
+            dispatch({ type: 'SET_CONTRACTIONS', payload: contractions });
+          } else {
+            console.warn('Auth not ready after 5 seconds');
+            dispatch({ type: 'SET_LOADING', payload: false });
+          }
         } else {
           // Local-only mode: no persistence, just empty state
           dispatch({ type: 'SET_LOADING', payload: false });
@@ -220,10 +235,23 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     const setupRealtimeSync = async () => {
       try {
-        unsubscribe = firestoreClient.subscribeToContractions((remoteContractions) => {
-          // Firebase handles merging, just update UI
-          dispatch({ type: 'SET_CONTRACTIONS', payload: remoteContractions });
-        });
+        // Wait for auth to be ready
+        const auth = await import('../config/firebase').then(m => m.getFirebaseAuth());
+
+        let attempts = 0;
+        while (!auth.currentUser && attempts < 50) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          attempts++;
+        }
+
+        if (auth.currentUser) {
+          unsubscribe = firestoreClient.subscribeToContractions((remoteContractions) => {
+            // Firebase handles merging, just update UI
+            dispatch({ type: 'SET_CONTRACTIONS', payload: remoteContractions });
+          });
+        } else {
+          console.warn('Auth not ready for real-time sync');
+        }
       } catch (error) {
         console.error('Failed to set up Firebase real-time sync:', error);
       }
