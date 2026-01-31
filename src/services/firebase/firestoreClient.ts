@@ -24,27 +24,18 @@ import {
 /**
  * Get or create userId for Firestore
  * This userId is used to isolate user data and enable link sharing
- * IMPORTANT: Uses Firebase Auth UID to match security rules
+ * Uses custom UUID (not auth UID) so share links work across devices
  */
 export const getUserId = (): string => {
-  const auth = getFirebaseAuth();
-
-  // Use the Firebase Auth user ID if available
-  if (auth.currentUser) {
-    const userId = auth.currentUser.uid;
-    setFirebaseUserId(userId); // Sync to localStorage
-    return userId;
-  }
-
-  // Fallback to localStorage (for before auth completes)
   let userId = getFirebaseUserId();
-  if (userId) {
-    return userId;
+
+  if (!userId) {
+    // Generate a new userId (UUID v4)
+    userId = crypto.randomUUID();
+    setFirebaseUserId(userId);
   }
 
-  // This shouldn't happen if auth is properly initialized
-  console.warn('getUserId called before authentication completed');
-  return '';
+  return userId;
 };
 
 /**

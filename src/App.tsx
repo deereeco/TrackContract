@@ -12,7 +12,7 @@ import ContractionChart from './components/Charts/ContractionChart';
 import Settings from './components/Settings/Settings';
 import DebugConsole from './components/Debug/DebugConsole';
 import { checkAndApplyUrlConfig } from './utils/urlConfig';
-import { getSyncBackend } from './services/storage/localStorage';
+import { getSyncBackend, setSyncBackend } from './services/storage/localStorage';
 import { initializeAuth, checkFirebaseConfig } from './config/firebase';
 import { setUserIdFromShareLink } from './services/firebase/firestoreClient';
 
@@ -35,7 +35,7 @@ function App() {
   // Initialize Firebase and check for share link on mount
   useEffect(() => {
     const initializeFirebase = async () => {
-      const backend = getSyncBackend();
+      let backend = getSyncBackend();
 
       // Check for userId in URL hash (share link)
       const hash = window.location.hash;
@@ -43,7 +43,15 @@ function App() {
       if (userIdMatch) {
         const userId = userIdMatch[1];
         setUserIdFromShareLink(userId);
-        // Clean up URL
+
+        // Auto-configure Firebase backend when using share link
+        if (checkFirebaseConfig()) {
+          setSyncBackend('firebase');
+          backend = 'firebase';
+          console.log('Share link detected - switched to Firebase backend');
+        }
+
+        // Clean up URL (for privacy)
         window.history.replaceState(null, '', window.location.pathname);
       }
 
