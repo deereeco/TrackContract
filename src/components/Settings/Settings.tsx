@@ -83,6 +83,7 @@ const Settings = () => {
 
       // Create export object
       const exportData = {
+        _readme: 'All dates are in ISO 8601 format (YYYY-MM-DDTHH:mm:ss.sssZ)',
         exportDate: new Date().toISOString(),
         userId: getUserId(),
         contractionCount: contractions.length,
