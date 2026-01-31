@@ -185,6 +185,21 @@ export const archiveContraction = async (id: string): Promise<void> => {
 };
 
 /**
+ * Restore an archived contraction
+ */
+export const restoreContraction = async (id: string): Promise<void> => {
+  try {
+    await updateContraction(id, {
+      archived: false,
+      updatedAt: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error restoring contraction in Firestore:', error);
+    throw error;
+  }
+};
+
+/**
  * Permanently delete a contraction from Firestore
  * Use with caution - this is irreversible
  */

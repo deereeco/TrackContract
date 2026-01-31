@@ -13,12 +13,12 @@ const ContractionItem = ({ contraction, index }: ContractionItemProps) => {
   const { deleteContraction } = useContractions();
 
   const handleDelete = async () => {
-    if (window.confirm('Are you sure you want to delete this contraction?')) {
+    if (window.confirm('Archive this contraction?\n\nIt will be hidden from the list but can be restored from Settings.')) {
       try {
         await deleteContraction(contraction.id);
       } catch (error) {
-        console.error('Failed to delete contraction:', error);
-        alert('Failed to delete contraction');
+        console.error('Failed to archive contraction:', error);
+        alert('Failed to archive contraction');
       }
     }
   };
@@ -68,7 +68,8 @@ const ContractionItem = ({ contraction, index }: ContractionItemProps) => {
           <button
             onClick={handleDelete}
             className="p-2 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors"
-            aria-label="Delete contraction"
+            aria-label="Archive contraction"
+            title="Archive (can be restored from Settings)"
           >
             <Trash2 className="w-5 h-5" />
           </button>

@@ -1,21 +1,28 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircle, Share2, Copy, Cloud, HardDrive, Download } from 'lucide-react';
+import { CheckCircle, Share2, Copy, Cloud, HardDrive, Download, RotateCcw, Trash2 } from 'lucide-react';
 import {
   getSyncBackend,
   setSyncBackend,
 } from '../../services/storage/localStorage';
 import { checkFirebaseConfig } from '../../config/firebase';
-import { getShareLink, getUserId, getAllContractions } from '../../services/firebase/firestoreClient';
+import { getShareLink, getUserId, getAllContractions, permanentlyDeleteContraction } from '../../services/firebase/firestoreClient';
+import { useContractions } from '../../contexts/ContractionContext';
 import type { SyncBackend } from '../../types/sync';
+import type { Contraction } from '../../types/contraction';
+import { formatDateTime, formatDurationReadable } from '../../utils/dateTime';
 
 const Settings = () => {
+  const { restoreContraction } = useContractions();
   const [backend, setBackendState] = useState<SyncBackend>(getSyncBackend());
   const [shareableLink, setShareableLink] = useState('');
   const [showCopySuccess, setShowCopySuccess] = useState(false);
   const [showBackendConfirm, setShowBackendConfirm] = useState(false);
   const [pendingBackend, setPendingBackend] = useState<SyncBackend | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
+  const [showArchived, setShowArchived] = useState(false);
+  const [archivedContractions, setArchivedContractions] = useState<Contraction[]>([]);
+  const [loadingArchived, setLoadingArchived] = useState(false);
 
   const handleBackendChange = (newBackend: SyncBackend) => {
     if (newBackend === backend) return;
@@ -116,6 +123,53 @@ const Settings = () => {
     } catch (error) {
       console.error('Export failed:', error);
       alert('Failed to export data. Please try again.');
+    }
+  };
+
+  const handleLoadArchived = async () => {
+    if (backend !== 'firebase') return;
+
+    setLoadingArchived(true);
+    try {
+      // Get all contractions including archived ones
+      const allContractions = await getAllContractions(true);
+      // Filter to only archived
+      const archived = allContractions.filter(c => c.archived);
+      setArchivedContractions(archived);
+      setShowArchived(true);
+    } catch (error) {
+      console.error('Failed to load archived contractions:', error);
+      alert('Failed to load archived contractions.');
+    } finally {
+      setLoadingArchived(false);
+    }
+  };
+
+  const handleRestoreContraction = async (id: string) => {
+    try {
+      await restoreContraction(id);
+      // Remove from archived list
+      setArchivedContractions(prev => prev.filter(c => c.id !== id));
+      alert('Contraction restored successfully!');
+    } catch (error) {
+      console.error('Failed to restore contraction:', error);
+      alert('Failed to restore contraction.');
+    }
+  };
+
+  const handlePermanentlyDelete = async (id: string) => {
+    if (!window.confirm('Permanently delete this contraction? This cannot be undone!')) {
+      return;
+    }
+
+    try {
+      await permanentlyDeleteContraction(id);
+      // Remove from archived list
+      setArchivedContractions(prev => prev.filter(c => c.id !== id));
+      alert('Contraction permanently deleted.');
+    } catch (error) {
+      console.error('Failed to delete contraction:', error);
+      alert('Failed to delete contraction.');
     }
   };
 
@@ -338,6 +392,85 @@ const Settings = () => {
           <p className="text-xs text-slate-600 dark:text-slate-400 mt-3">
             See <code className="bg-slate-200 dark:bg-slate-700 px-1 rounded">.env.example</code> for required variables
           </p>
+        </div>
+      )}
+
+      {/* Archived Contractions */}
+      {backend === 'firebase' && firebaseConfigured && (
+        <div className="bg-slate-100 dark:bg-slate-800 p-6 rounded-lg space-y-4">
+          <h3 className="text-lg font-semibold">Archived Contractions</h3>
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            View and restore contractions that have been archived.
+          </p>
+
+          {!showArchived ? (
+            <button
+              onClick={handleLoadArchived}
+              disabled={loadingArchived}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded-lg transition-colors disabled:opacity-50"
+            >
+              <RotateCcw className="w-5 h-5" />
+              {loadingArchived ? 'Loading...' : 'View Archived Contractions'}
+            </button>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <p className="text-sm font-medium">
+                  {archivedContractions.length} archived contraction{archivedContractions.length !== 1 ? 's' : ''}
+                </p>
+                <button
+                  onClick={() => setShowArchived(false)}
+                  className="text-sm text-slate-600 dark:text-slate-400 hover:underline"
+                >
+                  Hide
+                </button>
+              </div>
+
+              {archivedContractions.length === 0 ? (
+                <p className="text-sm text-slate-600 dark:text-slate-400 italic">
+                  No archived contractions found.
+                </p>
+              ) : (
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {archivedContractions.map((contraction) => (
+                    <div
+                      key={contraction.id}
+                      className="bg-white dark:bg-slate-700 p-4 rounded-lg flex justify-between items-start"
+                    >
+                      <div className="flex-1">
+                        <div className="font-medium">{formatDateTime(contraction.startTime)}</div>
+                        <div className="text-sm text-slate-600 dark:text-slate-400">
+                          Duration: {contraction.duration ? formatDurationReadable(contraction.duration) : 'N/A'}
+                          {contraction.intensity && ` • Intensity: ${contraction.intensity}/10`}
+                        </div>
+                        {contraction.notes && (
+                          <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                            Notes: {contraction.notes}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex gap-2 ml-4">
+                        <button
+                          onClick={() => handleRestoreContraction(contraction.id)}
+                          className="p-2 text-green-600 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg transition-colors"
+                          title="Restore contraction"
+                        >
+                          <RotateCcw className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => handlePermanentlyDelete(contraction.id)}
+                          className="p-2 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                          title="Permanently delete"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

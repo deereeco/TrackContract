@@ -147,6 +147,7 @@ interface ContractionContextType {
   updateContraction: (id: string, updates: Partial<Contraction>) => Promise<void>;
   deleteContraction: (id: string) => Promise<void>;
   archiveAllContractions: () => Promise<void>;
+  restoreContraction: (id: string) => Promise<void>;
   refreshContractions: () => Promise<void>;
   undo: () => Promise<void>;
   redo: () => Promise<void>;
@@ -440,6 +441,20 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   }, [state.contractions, refreshHistoryState]);
 
+  const restoreContraction = useCallback(async (id: string) => {
+    try {
+      const backend = getSyncBackend();
+      if (backend === 'firebase') {
+        // Restore in Firebase
+        await firestoreClient.restoreContraction(id);
+        // Real-time listener will update UI automatically
+      }
+    } catch (error) {
+      console.error('Failed to restore contraction:', error);
+      throw error;
+    }
+  }, []);
+
   const undo = useCallback(async () => {
     if (!historyManager.canUndo()) return;
 
@@ -568,6 +583,7 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         updateContraction,
         deleteContraction,
         archiveAllContractions,
+        restoreContraction,
         refreshContractions,
         undo,
         redo,
