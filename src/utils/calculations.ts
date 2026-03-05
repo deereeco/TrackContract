@@ -8,11 +8,20 @@ export const calculateDuration = (startTime: number, endTime: number): number =>
 };
 
 /**
- * Calculate the interval between two contractions in seconds
+ * Calculate the interval between two contractions in seconds (start-to-start)
  */
 export const calculateInterval = (contraction1: Contraction, contraction2: Contraction): number => {
-  if (!contraction1.endTime || !contraction2.startTime) return 0;
-  return Math.floor((contraction2.startTime - contraction1.endTime) / 1000);
+  const diff = contraction2.startTime - contraction1.startTime;
+  return diff > 0 ? Math.floor(diff / 1000) : 0;
+};
+
+/**
+ * Calculate the rest time between two contractions in seconds (end-to-start)
+ */
+export const calculateRestTime = (older: Contraction, newer: Contraction): number => {
+  if (!older.endTime) return 0;
+  const diff = newer.startTime - older.endTime;
+  return diff > 0 ? Math.floor(diff / 1000) : 0;
 };
 
 /**
@@ -26,6 +35,7 @@ export const calculateStats = (contractions: Contraction[]): ContractionStats =>
       total: 0,
       averageDuration: 0,
       averageInterval: 0,
+      averageRestTime: 0,
       recentContractions: []
     };
   }
@@ -34,22 +44,31 @@ export const calculateStats = (contractions: Contraction[]): ContractionStats =>
   const totalDuration = completedContractions.reduce((sum, c) => sum + (c.duration || 0), 0);
   const averageDuration = Math.floor(totalDuration / completedContractions.length);
 
-  // Calculate average interval
+  // Calculate average interval (start-to-start) and rest time (end-to-start)
   let totalInterval = 0;
   let intervalCount = 0;
+  let totalRestTime = 0;
+  let restTimeCount = 0;
   for (let i = 0; i < completedContractions.length - 1; i++) {
     const interval = calculateInterval(completedContractions[i + 1], completedContractions[i]);
     if (interval > 0) {
       totalInterval += interval;
       intervalCount++;
     }
+    const restTime = calculateRestTime(completedContractions[i + 1], completedContractions[i]);
+    if (restTime > 0) {
+      totalRestTime += restTime;
+      restTimeCount++;
+    }
   }
   const averageInterval = intervalCount > 0 ? Math.floor(totalInterval / intervalCount) : 0;
+  const averageRestTime = restTimeCount > 0 ? Math.floor(totalRestTime / restTimeCount) : 0;
 
   return {
     total: completedContractions.length,
     averageDuration,
     averageInterval,
+    averageRestTime,
     lastContraction: completedContractions[0],
     recentContractions: completedContractions.slice(0, 10)
   };
