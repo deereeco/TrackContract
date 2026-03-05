@@ -17,7 +17,8 @@ export interface Contraction {
 export interface ContractionStats {
   total: number;
   averageDuration: number;       // Seconds
-  averageInterval: number;       // Seconds
+  averageInterval: number;       // Seconds (start-to-start)
+  averageRestTime: number;       // Seconds (end-to-start)
   lastContraction?: Contraction;
   recentContractions: Contraction[];
 }

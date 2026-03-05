@@ -71,6 +71,23 @@ export const formatInterval = (seconds: number): string => {
 };
 
 /**
+ * Format rest time in seconds to a readable string (e.g., "5 min rest")
+ */
+export const formatRestTime = (seconds: number): string => {
+  const mins = Math.floor(seconds / 60);
+
+  if (mins < 1) {
+    return `${seconds}s rest`;
+  }
+
+  if (mins === 1) {
+    return '1 min rest';
+  }
+
+  return `${mins} min rest`;
+};
+
+/**
  * Get relative time string (e.g., "2 minutes ago", "just now")
  */
 export const getRelativeTime = (timestamp: number): string => {

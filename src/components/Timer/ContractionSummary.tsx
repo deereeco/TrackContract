@@ -1,8 +1,8 @@
 import { motion } from 'framer-motion';
 import { useContractions } from '../../contexts/ContractionContext';
-import { calculateStats } from '../../utils/calculations';
-import { formatTime, formatDurationReadable, formatInterval } from '../../utils/dateTime';
-import { Clock, Activity, TrendingUp } from 'lucide-react';
+import { calculateStats, calculateRestTime } from '../../utils/calculations';
+import { formatTime, formatDurationReadable, formatInterval, formatRestTime } from '../../utils/dateTime';
+import { Clock, Activity, TrendingUp, Coffee } from 'lucide-react';
 
 const ContractionSummary = () => {
   const { state } = useContractions();
@@ -22,8 +22,8 @@ const ContractionSummary = () => {
 
   return (
     <div className="space-y-6">
-      {/* Stats Overview */}
-      <div className="grid grid-cols-3 gap-4">
+      {/* Stats Overview — 2×2 grid */}
+      <div className="grid grid-cols-2 gap-4">
         <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-lg text-center">
           <div className="flex justify-center mb-2">
             <Clock className="w-5 h-5 text-primary" />
@@ -45,7 +45,15 @@ const ContractionSummary = () => {
             <TrendingUp className="w-5 h-5 text-primary" />
           </div>
           <div className="text-2xl font-bold">{Math.floor(stats.averageInterval / 60)}m</div>
-          <div className="text-xs text-slate-600 dark:text-slate-400">Avg Interval</div>
+          <div className="text-xs text-slate-600 dark:text-slate-400">Avg Apart</div>
+        </div>
+
+        <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-lg text-center">
+          <div className="flex justify-center mb-2">
+            <Coffee className="w-5 h-5 text-primary" />
+          </div>
+          <div className="text-2xl font-bold">{Math.floor(stats.averageRestTime / 60)}m</div>
+          <div className="text-xs text-slate-600 dark:text-slate-400">Avg Rest</div>
         </div>
       </div>
 
@@ -78,6 +86,11 @@ const ContractionSummary = () => {
                     {formatInterval(
                       Math.floor((recentThree[index].startTime - recentThree[index + 1].startTime) / 1000)
                     )}
+                    <span className="block">
+                      {formatRestTime(
+                        calculateRestTime(recentThree[index + 1], recentThree[index])
+                      )}
+                    </span>
                   </div>
                 )}
               </div>

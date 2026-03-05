@@ -1,14 +1,11 @@
 import { GoogleSheetsConfig, SyncBackend } from '../../types/sync';
 import { HistoryEntry } from '../../types/history';
 
-export type ChartDisplayMode = 'duration' | 'interval' | 'both';
-
 const KEYS = {
   THEME: 'contraction-tracker-theme',
   GOOGLE_SHEETS_CONFIG: 'contraction-tracker-google-sheets-config',
   LAST_SYNC_TIME: 'contraction-tracker-last-sync',
   INTENSITY_PROMPT_ENABLED: 'contraction-tracker-intensity-prompt-enabled',
-  CHART_DISPLAY_MODE: 'contraction-tracker-chart-display-mode',
   FIREBASE_USER_ID: 'contraction-tracker-firebase-user-id',
   SYNC_BACKEND: 'contraction-tracker-sync-backend',
   HISTORY_ENTRIES: 'contraction-tracker-history-entries',
@@ -72,19 +69,6 @@ export const getIntensityPromptEnabled = (): boolean => {
 
 export const setIntensityPromptEnabled = (enabled: boolean): void => {
   localStorage.setItem(KEYS.INTENSITY_PROMPT_ENABLED, enabled.toString());
-};
-
-// Chart display mode
-export const getChartDisplayMode = (): ChartDisplayMode => {
-  const stored = localStorage.getItem(KEYS.CHART_DISPLAY_MODE);
-  if (stored === 'duration' || stored === 'interval' || stored === 'both') {
-    return stored;
-  }
-  return 'both'; // Default to both charts
-};
-
-export const setChartDisplayMode = (mode: ChartDisplayMode): void => {
-  localStorage.setItem(KEYS.CHART_DISPLAY_MODE, mode);
 };
 
 // Firebase user ID management
