@@ -11,8 +11,8 @@ export const calculateDuration = (startTime: number, endTime: number): number =>
  * Calculate the interval between two contractions in seconds
  */
 export const calculateInterval = (contraction1: Contraction, contraction2: Contraction): number => {
-  if (!contraction1.endTime || !contraction2.startTime) return 0;
-  return Math.floor((contraction2.startTime - contraction1.endTime) / 1000);
+  const diff = contraction2.startTime - contraction1.startTime;
+  return diff > 0 ? Math.floor(diff / 1000) : 0;
 };
 
 /**

@@ -28,8 +28,8 @@ const ContractionChart = () => {
     return reversed.map((contraction, index) => {
       // Calculate interval from previous contraction
       let interval = 0;
-      if (index > 0 && reversed[index - 1].endTime) {
-        interval = Math.floor((contraction.startTime - reversed[index - 1].endTime!) / 1000 / 60); // minutes
+      if (index > 0) {
+        interval = Math.floor((contraction.startTime - reversed[index - 1].startTime) / 1000 / 60); // minutes
       }
 
       return {

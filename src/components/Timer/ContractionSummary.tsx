@@ -76,7 +76,7 @@ const ContractionSummary = () => {
                 {index < recentThree.length - 1 && (
                   <div className="text-xs text-slate-600 dark:text-slate-400">
                     {formatInterval(
-                      Math.floor((recentThree[index].startTime - (recentThree[index + 1].endTime || 0)) / 1000)
+                      Math.floor((recentThree[index].startTime - recentThree[index + 1].startTime) / 1000)
                     )}
                   </div>
                 )}
