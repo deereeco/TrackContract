@@ -10,6 +10,8 @@ const KEYS = {
   SYNC_BACKEND: 'contraction-tracker-sync-backend',
   HISTORY_ENTRIES: 'contraction-tracker-history-entries',
   HISTORY_POINTER: 'contraction-tracker-history-pointer',
+  ACTIVE_SESSION_ID: 'contraction-tracker-active-session-id',
+  VIEWER_SESSION_ID: 'contraction-tracker-viewer-session-id',
 } as const;
 
 // Theme management
@@ -125,6 +127,32 @@ export const setHistoryPointer = (pointer: number): void => {
 export const clearHistory = (): void => {
   localStorage.removeItem(KEYS.HISTORY_ENTRIES);
   localStorage.removeItem(KEYS.HISTORY_POINTER);
+};
+
+// Active session management (midwife's last-used session)
+export const getActiveSessionId = (): string | null => {
+  return localStorage.getItem(KEYS.ACTIVE_SESSION_ID);
+};
+
+export const setActiveSessionId = (id: string): void => {
+  localStorage.setItem(KEYS.ACTIVE_SESSION_ID, id);
+};
+
+export const clearActiveSessionId = (): void => {
+  localStorage.removeItem(KEYS.ACTIVE_SESSION_ID);
+};
+
+// Viewer session management (anonymous viewer's joined session)
+export const getViewerSessionId = (): string | null => {
+  return localStorage.getItem(KEYS.VIEWER_SESSION_ID);
+};
+
+export const setViewerSessionId = (id: string): void => {
+  localStorage.setItem(KEYS.VIEWER_SESSION_ID, id);
+};
+
+export const clearViewerSessionId = (): void => {
+  localStorage.removeItem(KEYS.VIEWER_SESSION_ID);
 };
 
 // Clear all stored data
