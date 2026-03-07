@@ -5,7 +5,15 @@ import {
   persistentLocalCache,
   persistentMultipleTabManager,
 } from 'firebase/firestore';
-import { getAuth, Auth, signInAnonymously } from 'firebase/auth';
+import {
+  getAuth,
+  Auth,
+  signInAnonymously,
+  signInWithPopup,
+  GoogleAuthProvider,
+  signOut,
+  onAuthStateChanged,
+} from 'firebase/auth';
 import { firebaseConfig } from './firebaseConfig';
 
 // Validate Firebase config
@@ -83,27 +91,37 @@ export const getFirebaseAuth = (): Auth => {
 };
 
 /**
- * Initialize Firebase authentication
- * Signs in anonymously for link-sharing functionality
+ * Sign in anonymously (for viewers joining via share link)
  */
-export const initializeAuth = async (): Promise<void> => {
+export const signInAnonymouslyForViewer = async (): Promise<void> => {
   const firebaseAuth = getFirebaseAuth();
-
-  // Check if already signed in
-  if (firebaseAuth.currentUser) {
-    console.log('Already authenticated:', firebaseAuth.currentUser.uid);
-    return;
-  }
-
-  // Sign in anonymously
+  if (firebaseAuth.currentUser) return;
   try {
-    const userCredential = await signInAnonymously(firebaseAuth);
-    console.log('Signed in anonymously:', userCredential.user.uid);
+    await signInAnonymously(firebaseAuth);
   } catch (error) {
     console.error('Failed to sign in anonymously:', error);
     throw error;
   }
 };
+
+/**
+ * Sign in with Google popup
+ */
+export const signInWithGooglePopup = async (): Promise<void> => {
+  const firebaseAuth = getFirebaseAuth();
+  const provider = new GoogleAuthProvider();
+  await signInWithPopup(firebaseAuth, provider);
+};
+
+/**
+ * Sign out the current user
+ */
+export const signOutUser = async (): Promise<void> => {
+  const firebaseAuth = getFirebaseAuth();
+  await signOut(firebaseAuth);
+};
+
+export { onAuthStateChanged };
 
 /**
  * Check if Firebase is properly configured
