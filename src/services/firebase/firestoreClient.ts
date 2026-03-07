@@ -22,29 +22,39 @@ import {
 } from '../storage/localStorage';
 
 /**
- * Get or create userId for Firestore
- * This userId is used to isolate user data and enable link sharing
- * Uses custom UUID (not auth UID) so share links work across devices
+ * Get the Firestore collection reference for contractions in a session
  */
-export const getUserId = (): string => {
-  let userId = getFirebaseUserId();
+const getContractionsCollection = (sessionId: string) => {
+  const db = getFirebaseDb();
+  return collection(db, 'sessions', sessionId, 'contractions');
+};
 
+/**
+ * Legacy: get collection for old anonymous UUID-based path
+ */
+const getLegacyContractionsCollection = () => {
+  const db = getFirebaseDb();
+  const userId = getLegacyUserId();
+  return collection(db, 'users', userId, 'contractions');
+};
+
+/**
+ * Legacy: get or create userId for old share-link format
+ */
+export const getLegacyUserId = (): string => {
+  let userId = getFirebaseUserId();
   if (!userId) {
-    // Generate a new userId (UUID v4)
     userId = crypto.randomUUID();
     setFirebaseUserId(userId);
   }
-
   return userId;
 };
 
 /**
- * Get the Firestore collection reference for contractions
+ * Legacy: set userId from old-style #userId= share link
  */
-const getContractionsCollection = () => {
-  const db = getFirebaseDb();
-  const userId = getUserId();
-  return collection(db, 'users', userId, 'contractions');
+export const setUserIdFromShareLink = (userId: string): void => {
+  setFirebaseUserId(userId);
 };
 
 /**
@@ -62,7 +72,6 @@ const timestampToNumber = (timestamp: any): number => {
  */
 const documentToContraction = (doc: DocumentData): Contraction => {
   const data = doc.data();
-
   return {
     id: doc.id,
     startTime: timestampToNumber(data.startTime),
@@ -72,7 +81,7 @@ const documentToContraction = (doc: DocumentData): Contraction => {
     notes: data.notes ?? undefined,
     createdAt: timestampToNumber(data.createdAt),
     updatedAt: timestampToNumber(data.updatedAt),
-    syncStatus: 'synced', // Always synced if coming from Firestore
+    syncStatus: 'synced',
     syncedAt: Date.now(),
     archived: data.archived ?? false,
   };
@@ -80,10 +89,9 @@ const documentToContraction = (doc: DocumentData): Contraction => {
 
 /**
  * Convert Contraction object to Firestore document data
- * Filters out undefined values (Firestore doesn't support undefined)
  */
 const contractionToDocument = (contraction: Contraction): any => {
-  const doc: any = {
+  const docData: any = {
     startTime: contraction.startTime,
     endTime: contraction.endTime,
     duration: contraction.duration,
@@ -91,38 +99,24 @@ const contractionToDocument = (contraction: Contraction): any => {
     updatedAt: contraction.updatedAt,
     archived: contraction.archived ?? false,
   };
-
-  // Only include optional fields if they're defined
-  if (contraction.intensity !== undefined) {
-    doc.intensity = contraction.intensity;
-  }
-  if (contraction.notes !== undefined) {
-    doc.notes = contraction.notes;
-  }
-
-  return doc;
+  if (contraction.intensity !== undefined) docData.intensity = contraction.intensity;
+  if (contraction.notes !== undefined) docData.notes = contraction.notes;
+  return docData;
 };
 
-/**
- * Add a new contraction to Firestore
- */
+// ─── Session-scoped operations ────────────────────────────────────────────────
+
 export const addContraction = async (
-  contraction: Contraction
+  contraction: Contraction,
+  sessionId: string
 ): Promise<string> => {
   try {
-    const contractionsRef = getContractionsCollection();
+    const contractionsRef = getContractionsCollection(sessionId);
     const docData = contractionToDocument(contraction);
-
-    // Use the contraction's ID as the document ID
     const docRef = doc(contractionsRef, contraction.id);
     await updateDoc(docRef, docData).catch(async () => {
-      // Document doesn't exist, create it
-      await addDoc(contractionsRef, {
-        ...docData,
-        id: contraction.id,
-      });
+      await addDoc(contractionsRef, { ...docData, id: contraction.id });
     });
-
     return contraction.id;
   } catch (error) {
     console.error('Error adding contraction to Firestore:', error);
@@ -130,31 +124,22 @@ export const addContraction = async (
   }
 };
 
-/**
- * Update an existing contraction in Firestore
- */
 export const updateContraction = async (
   id: string,
-  updates: Partial<Contraction>
+  updates: Partial<Contraction>,
+  sessionId: string
 ): Promise<void> => {
   try {
-    const contractionsRef = getContractionsCollection();
+    const contractionsRef = getContractionsCollection(sessionId);
     const docRef = doc(contractionsRef, id);
-
-    // Convert updates to Firestore format
     const docUpdates: any = {};
-    if (updates.startTime !== undefined)
-      docUpdates.startTime = updates.startTime;
+    if (updates.startTime !== undefined) docUpdates.startTime = updates.startTime;
     if (updates.endTime !== undefined) docUpdates.endTime = updates.endTime;
     if (updates.duration !== undefined) docUpdates.duration = updates.duration;
-    if (updates.intensity !== undefined)
-      docUpdates.intensity = updates.intensity;
+    if (updates.intensity !== undefined) docUpdates.intensity = updates.intensity;
     if (updates.notes !== undefined) docUpdates.notes = updates.notes;
     if (updates.archived !== undefined) docUpdates.archived = updates.archived;
-
-    // Always update updatedAt timestamp
     docUpdates.updatedAt = updates.updatedAt ?? Date.now();
-
     await updateDoc(docRef, docUpdates);
   } catch (error) {
     console.error('Error updating contraction in Firestore:', error);
@@ -162,52 +147,27 @@ export const updateContraction = async (
   }
 };
 
-/**
- * Delete a contraction from Firestore (soft delete)
- */
-export const deleteContraction = async (id: string): Promise<void> => {
+export const deleteContraction = async (id: string, sessionId: string): Promise<void> => {
   try {
-    await updateContraction(id, {
-      archived: true,
-      updatedAt: Date.now(),
-    });
+    await updateContraction(id, { archived: true, updatedAt: Date.now() }, sessionId);
   } catch (error) {
     console.error('Error deleting contraction in Firestore:', error);
     throw error;
   }
 };
 
-/**
- * Archive a contraction (alias for delete)
- */
-export const archiveContraction = async (id: string): Promise<void> => {
-  return deleteContraction(id);
-};
-
-/**
- * Restore an archived contraction
- */
-export const restoreContraction = async (id: string): Promise<void> => {
+export const restoreContraction = async (id: string, sessionId: string): Promise<void> => {
   try {
-    await updateContraction(id, {
-      archived: false,
-      updatedAt: Date.now(),
-    });
+    await updateContraction(id, { archived: false, updatedAt: Date.now() }, sessionId);
   } catch (error) {
     console.error('Error restoring contraction in Firestore:', error);
     throw error;
   }
 };
 
-/**
- * Permanently delete a contraction from Firestore
- * Use with caution - this is irreversible
- */
-export const permanentlyDeleteContraction = async (
-  id: string
-): Promise<void> => {
+export const permanentlyDeleteContraction = async (id: string, sessionId: string): Promise<void> => {
   try {
-    const contractionsRef = getContractionsCollection();
+    const contractionsRef = getContractionsCollection(sessionId);
     const docRef = doc(contractionsRef, id);
     await deleteDoc(docRef);
   } catch (error) {
@@ -216,103 +176,54 @@ export const permanentlyDeleteContraction = async (
   }
 };
 
-/**
- * Get all contractions from Firestore
- */
 export const getAllContractions = async (
+  sessionId: string,
   includeArchived: boolean = false
 ): Promise<Contraction[]> => {
   try {
-    const contractionsRef = getContractionsCollection();
-
-    // Query contractions
+    const contractionsRef = getContractionsCollection(sessionId);
     const q = includeArchived
       ? query(contractionsRef, orderBy('startTime', 'desc'))
-      : query(
-          contractionsRef,
-          where('archived', '==', false),
-          orderBy('startTime', 'desc')
-        );
-
+      : query(contractionsRef, where('archived', '==', false), orderBy('startTime', 'desc'));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map((doc) => documentToContraction(doc));
+    return snapshot.docs.map(doc => documentToContraction(doc));
   } catch (error) {
     console.error('Error getting contractions from Firestore:', error);
     throw error;
   }
 };
 
-/**
- * Subscribe to real-time updates for contractions
- * Returns an unsubscribe function
- */
 export const subscribeToContractions = (
+  sessionId: string,
   callback: (contractions: Contraction[]) => void,
   includeArchived: boolean = false
 ): Unsubscribe => {
   try {
-    const contractionsRef = getContractionsCollection();
-
-    // Query contractions
+    const contractionsRef = getContractionsCollection(sessionId);
     const q = includeArchived
       ? query(contractionsRef, orderBy('startTime', 'desc'))
-      : query(
-          contractionsRef,
-          where('archived', '==', false),
-          orderBy('startTime', 'desc')
-        );
-
-    // Subscribe to changes
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const contractions = snapshot.docs.map((doc) =>
-          documentToContraction(doc)
-        );
-        callback(contractions);
-      },
-      (error) => {
-        console.error('Error in Firestore subscription:', error);
-      }
+      : query(contractionsRef, where('archived', '==', false), orderBy('startTime', 'desc'));
+    return onSnapshot(q,
+      snapshot => callback(snapshot.docs.map(doc => documentToContraction(doc))),
+      error => console.error('Error in Firestore subscription:', error)
     );
-
-    return unsubscribe;
   } catch (error) {
     console.error('Error subscribing to Firestore:', error);
     throw error;
   }
 };
 
-/**
- * Unsubscribe from real-time updates
- */
-export const unsubscribeFromContractions = (
-  unsubscribe: Unsubscribe
-): void => {
-  if (unsubscribe) {
-    unsubscribe();
-  }
+export const unsubscribeFromContractions = (unsubscribe: Unsubscribe): void => {
+  if (unsubscribe) unsubscribe();
 };
 
-/**
- * Batch archive multiple contractions
- */
-export const batchArchive = async (ids: string[]): Promise<void> => {
+export const batchArchive = async (ids: string[], sessionId: string): Promise<void> => {
   try {
     const db = getFirebaseDb();
-    const contractionsRef = getContractionsCollection();
+    const contractionsRef = getContractionsCollection(sessionId);
     const batch = writeBatch(db);
-
     const now = Date.now();
-
-    ids.forEach((id) => {
-      const docRef = doc(contractionsRef, id);
-      batch.update(docRef, {
-        archived: true,
-        updatedAt: now,
-      });
-    });
-
+    ids.forEach(id => batch.update(doc(contractionsRef, id), { archived: true, updatedAt: now }));
     await batch.commit();
   } catch (error) {
     console.error('Error batch archiving contractions in Firestore:', error);
@@ -320,21 +231,12 @@ export const batchArchive = async (ids: string[]): Promise<void> => {
   }
 };
 
-/**
- * Batch delete multiple contractions permanently
- * Use with caution - this is irreversible
- */
-export const batchDelete = async (ids: string[]): Promise<void> => {
+export const batchDelete = async (ids: string[], sessionId: string): Promise<void> => {
   try {
     const db = getFirebaseDb();
-    const contractionsRef = getContractionsCollection();
+    const contractionsRef = getContractionsCollection(sessionId);
     const batch = writeBatch(db);
-
-    ids.forEach((id) => {
-      const docRef = doc(contractionsRef, id);
-      batch.delete(docRef);
-    });
-
+    ids.forEach(id => batch.delete(doc(contractionsRef, id)));
     await batch.commit();
   } catch (error) {
     console.error('Error batch deleting contractions in Firestore:', error);
@@ -342,18 +244,44 @@ export const batchDelete = async (ids: string[]): Promise<void> => {
   }
 };
 
-/**
- * Get a share link for the current user
- */
-export const getShareLink = (): string => {
-  const userId = getUserId();
-  const baseUrl = window.location.origin + window.location.pathname;
-  return `${baseUrl}#userId=${userId}`;
+// ─── Legacy operations (for old #userId= share links) ────────────────────────
+
+export const legacySubscribeToContractions = (
+  callback: (contractions: Contraction[]) => void
+): Unsubscribe => {
+  const contractionsRef = getLegacyContractionsCollection();
+  const q = query(contractionsRef, where('archived', '==', false), orderBy('startTime', 'desc'));
+  return onSnapshot(q,
+    snapshot => callback(snapshot.docs.map(doc => documentToContraction(doc))),
+    error => console.error('Error in legacy Firestore subscription:', error)
+  );
 };
 
-/**
- * Set the userId from a share link
- */
-export const setUserIdFromShareLink = (userId: string): void => {
-  setFirebaseUserId(userId);
+export const legacyAddContraction = async (contraction: Contraction): Promise<string> => {
+  const contractionsRef = getLegacyContractionsCollection();
+  const docData = contractionToDocument(contraction);
+  const docRef = doc(contractionsRef, contraction.id);
+  await updateDoc(docRef, docData).catch(async () => {
+    await addDoc(contractionsRef, { ...docData, id: contraction.id });
+  });
+  return contraction.id;
 };
+
+export const legacyUpdateContraction = async (
+  id: string,
+  updates: Partial<Contraction>
+): Promise<void> => {
+  const contractionsRef = getLegacyContractionsCollection();
+  const docRef = doc(contractionsRef, id);
+  const docUpdates: any = { updatedAt: updates.updatedAt ?? Date.now() };
+  if (updates.startTime !== undefined) docUpdates.startTime = updates.startTime;
+  if (updates.endTime !== undefined) docUpdates.endTime = updates.endTime;
+  if (updates.duration !== undefined) docUpdates.duration = updates.duration;
+  if (updates.intensity !== undefined) docUpdates.intensity = updates.intensity;
+  if (updates.notes !== undefined) docUpdates.notes = updates.notes;
+  if (updates.archived !== undefined) docUpdates.archived = updates.archived;
+  await updateDoc(docRef, docUpdates);
+};
+
+// Keep getUserId exported for backward compat (used in Settings for display)
+export const getUserId = getLegacyUserId;
