@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { SessionProvider, useSession } from './contexts/SessionContext';
 import { ContractionProvider } from './contexts/ContractionContext';
 import { SyncProvider } from './contexts/SyncContext';
 import Header from './components/Layout/Header';
@@ -11,102 +13,137 @@ import ContractionList from './components/ContractionList/ContractionList';
 import ContractionChart from './components/Charts/ContractionChart';
 import Settings from './components/Settings/Settings';
 import DebugConsole from './components/Debug/DebugConsole';
-import { checkAndApplyUrlConfig } from './utils/urlConfig';
-import { getSyncBackend, setSyncBackend } from './services/storage/localStorage';
-import { initializeAuth, checkFirebaseConfig } from './config/firebase';
-import { setUserIdFromShareLink } from './services/firebase/firestoreClient';
+import GoogleSignIn from './components/Auth/GoogleSignIn';
+import SessionDashboard from './components/Sessions/SessionDashboard';
+import ViewerLanding from './components/Sessions/ViewerLanding';
+import { resolveShareToken } from './services/firebase/sessionClient';
+import { setUserIdFromShareLink as setLegacyUserId } from './services/firebase/firestoreClient';
+import { setViewerSessionId as storeViewerSessionId } from './services/storage/localStorage';
+import { signInAnonymouslyForViewer } from './config/firebase';
 
 type Tab = 'timer' | 'list' | 'chart' | 'settings';
 
-function App() {
+/**
+ * Inner app — rendered after auth and providers are ready.
+ * Handles URL hash resolution and decides what to render.
+ */
+const AppContent = () => {
+  const { user, isAnonymous, authLoading, signInAnonymously } = useAuth();
+  const { activeSession, selectSession } = useSession();
   const [activeTab, setActiveTab] = useState<Tab>('timer');
-  const [showConfigMessage, setShowConfigMessage] = useState(false);
+  const [showViewerLanding, setShowViewerLanding] = useState(false);
+  const [hashResolved, setHashResolved] = useState(false);
 
-  // Check for URL configuration on mount
+  // Resolve URL hash on mount (before deciding what to render)
   useEffect(() => {
-    const wasConfigured = checkAndApplyUrlConfig();
-    if (wasConfigured) {
-      setShowConfigMessage(true);
-      // Hide message after 5 seconds
-      setTimeout(() => setShowConfigMessage(false), 5000);
-    }
-  }, []);
-
-  // Initialize Firebase and check for share link on mount
-  useEffect(() => {
-    const initializeFirebase = async () => {
-      let backend = getSyncBackend();
-
-      // Check for userId in URL hash (share link)
+    const resolveHash = async () => {
       const hash = window.location.hash;
-      const userIdMatch = hash.match(/userId=([^&]+)/);
-      if (userIdMatch) {
-        const userId = userIdMatch[1];
-        setUserIdFromShareLink(userId);
 
-        // Auto-configure Firebase backend when using share link
-        if (checkFirebaseConfig()) {
-          setSyncBackend('firebase');
-          backend = 'firebase';
-          console.log('Share link detected - switched to Firebase backend');
+      if (hash.includes('token=')) {
+        // New-style share link: #token={shareToken}
+        const tokenMatch = hash.match(/token=([^&]+)/);
+        if (tokenMatch) {
+          const token = tokenMatch[1];
+          try {
+            const sessionId = await resolveShareToken(token);
+            if (sessionId) {
+              storeViewerSessionId(sessionId);
+              await signInAnonymously();
+              await selectSession(sessionId);
+            }
+          } catch (err) {
+            console.error('Failed to resolve share token:', err);
+          }
         }
+        window.history.replaceState(null, '', window.location.pathname);
 
-        // Clean up URL (for privacy)
+      } else if (hash.includes('session=')) {
+        // Direct session ID link: #session={sessionId}
+        const sessionMatch = hash.match(/session=([^&]+)/);
+        if (sessionMatch) {
+          const sessionId = sessionMatch[1];
+          storeViewerSessionId(sessionId);
+          try {
+            await signInAnonymously();
+            await selectSession(sessionId);
+          } catch (err) {
+            console.error('Failed to join session:', err);
+          }
+        }
+        window.history.replaceState(null, '', window.location.pathname);
+
+      } else if (hash.includes('userId=')) {
+        // Legacy share link: #userId={uuid}
+        const userIdMatch = hash.match(/userId=([^&]+)/);
+        if (userIdMatch) {
+          setLegacyUserId(userIdMatch[1]);
+          await signInAnonymouslyForViewer();
+        }
         window.history.replaceState(null, '', window.location.pathname);
       }
 
-      // Initialize Firebase if backend is set to Firebase and config is available
-      if (backend === 'firebase' && checkFirebaseConfig()) {
-        try {
-          await initializeAuth();
-          console.log('Firebase initialized successfully');
-        } catch (error) {
-          console.error('Failed to initialize Firebase:', error);
-        }
-      }
+      setHashResolved(true);
     };
 
-    initializeFirebase();
-  }, []);
+    resolveHash();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  if (authLoading || !hashResolved) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Not authenticated at all → show sign-in or viewer landing
+  if (!user) {
+    if (showViewerLanding) return <ViewerLanding />;
+    return <GoogleSignIn onViewSession={() => setShowViewerLanding(true)} />;
+  }
+
+  // Authenticated but no active session
+  if (!activeSession) {
+    if (isAnonymous) return <ViewerLanding />;
+    return <SessionDashboard />;
+  }
+
+  // Active session → main tracker UI
+  return (
+    <div className="min-h-screen flex flex-col">
+      <Header />
+      <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
+      <main className="flex-1 container mx-auto px-4 py-8 pb-24 md:pb-8">
+        <div className="max-w-4xl mx-auto">
+          {activeTab === 'timer' && (
+            <div className="space-y-8">
+              <TimerButton />
+              <IntensityToggle />
+              <ContractionSummary />
+            </div>
+          )}
+          {activeTab === 'list' && <ContractionList />}
+          {activeTab === 'chart' && <ContractionChart />}
+          {activeTab === 'settings' && <Settings />}
+        </div>
+      </main>
+      <DebugConsole />
+    </div>
+  );
+};
+
+function App() {
   return (
     <ThemeProvider>
-      <SyncProvider>
-        <ContractionProvider>
-          <div className="min-h-screen flex flex-col">
-            <Header />
-            <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
-
-            {/* Auto-configuration success message */}
-            {showConfigMessage && (
-              <div className="bg-green-100 dark:bg-green-900/30 border-b border-green-300 dark:border-green-700 px-4 py-3 text-center">
-                <p className="text-green-700 dark:text-green-400 font-medium">
-                  ✓ App automatically configured! You're ready to track contractions.
-                </p>
-              </div>
-            )}
-
-            <main className="flex-1 container mx-auto px-4 py-8 pb-24 md:pb-8">
-              <div className="max-w-4xl mx-auto">
-                {activeTab === 'timer' && (
-                  <div className="space-y-8">
-                    <TimerButton />
-                    <IntensityToggle />
-                    <ContractionSummary />
-                  </div>
-                )}
-
-                {activeTab === 'list' && <ContractionList />}
-
-                {activeTab === 'chart' && <ContractionChart />}
-
-                {activeTab === 'settings' && <Settings />}
-              </div>
-            </main>
-          </div>
-          <DebugConsole />
-        </ContractionProvider>
-      </SyncProvider>
+      <AuthProvider>
+        <SessionProvider>
+          <SyncProvider>
+            <ContractionProvider>
+              <AppContent />
+            </ContractionProvider>
+          </SyncProvider>
+        </SessionProvider>
+      </AuthProvider>
     </ThemeProvider>
   );
 }
