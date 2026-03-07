@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { SyncState, SyncBackend } from '../types/sync';
-import { getSyncBackend } from '../services/storage/localStorage';
+import { SyncState } from '../types/sync';
 
 interface SyncContextType {
   syncState: SyncState;
@@ -11,7 +10,6 @@ const SyncContext = createContext<SyncContextType | undefined>(undefined);
 
 export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [backend] = useState<SyncBackend>(getSyncBackend());
 
   // Monitor online/offline status
   useEffect(() => {
@@ -27,13 +25,13 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  // Sync status is always "real-time" for Firebase
+  // Firebase is always the backend — always real-time
   const syncState: SyncState = {
-    status: backend === 'firebase' ? 'idle' : 'offline',
+    status: 'idle',
     lastSyncTime: Date.now(),
     pendingOperations: 0,
-    backend,
-    realtimeEnabled: backend === 'firebase',
+    backend: 'firebase',
+    realtimeEnabled: true,
   };
 
   return (
