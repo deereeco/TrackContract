@@ -99,7 +99,7 @@ const AppContent = () => {
 
   // Not authenticated at all → show sign-in or viewer landing
   if (!user) {
-    if (showViewerLanding) return <ViewerLanding />;
+    if (showViewerLanding) return <ViewerLanding onBack={() => setShowViewerLanding(false)} />;
     return <GoogleSignIn onViewSession={() => setShowViewerLanding(true)} />;
   }
 

@@ -4,7 +4,11 @@ import { useAuth } from '../../contexts/AuthContext';
 import { resolveShareToken } from '../../services/firebase/sessionClient';
 import { setViewerSessionId } from '../../services/storage/localStorage';
 
-const ViewerLanding = () => {
+interface ViewerLandingProps {
+  onBack?: () => void;
+}
+
+const ViewerLanding = ({ onBack }: ViewerLandingProps) => {
   const { selectSession } = useSession();
   const { signInAnonymously, signOut, user } = useAuth();
   const [input, setInput] = useState('');
@@ -91,7 +95,7 @@ const ViewerLanding = () => {
 
           <div className="pt-2 border-t border-slate-200 dark:border-slate-700 text-center">
             <button
-              onClick={() => signOut()}
+              onClick={() => { if (user) signOut(); else onBack?.(); }}
               className="text-sm text-primary hover:underline"
             >
               Sign in with your own Google account
