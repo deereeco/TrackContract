@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircle, Share2, Copy, Download, RotateCcw, Trash2, LogOut, Pencil } from 'lucide-react';
+import { CheckCircle, Share2, Copy, Download, RotateCcw, Trash2, LogOut, Pencil, RefreshCw } from 'lucide-react';
+import { useUpdate } from '../../contexts/UpdateContext';
+import { APP_VERSION } from '../../version';
 import { getAllContractions, permanentlyDeleteContraction } from '../../services/firebase/firestoreClient';
 import { useContractions } from '../../contexts/ContractionContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -10,6 +12,7 @@ import type { Contraction } from '../../types/contraction';
 import { formatDateTime, formatDurationReadable } from '../../utils/dateTime';
 
 const Settings = () => {
+  const { updateAvailable, applyUpdate } = useUpdate();
   const { restoreContraction } = useContractions();
   const { user, signOut, isAnonymous } = useAuth();
   const { activeSession, updateSession } = useSession();
@@ -131,6 +134,26 @@ const Settings = () => {
           Manage your session and sharing options.
         </p>
       </div>
+
+      {/* App Update */}
+      {updateAvailable && (
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-6 rounded-lg space-y-3">
+          <div className="flex items-center gap-2">
+            <RefreshCw className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+            <h3 className="text-lg font-semibold">App Update Available</h3>
+          </div>
+          <p className="text-sm text-slate-700 dark:text-slate-300">
+            A new version of the app is ready to install. Your data is safe — updating only refreshes the app.
+          </p>
+          <button
+            onClick={applyUpdate}
+            className="flex items-center gap-2 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Update Now
+          </button>
+        </div>
+      )}
 
       {/* Session Info */}
       {activeSession && (
@@ -339,6 +362,10 @@ const Settings = () => {
           </button>
         </div>
       )}
+
+      <p className="text-xs text-center text-slate-400 dark:text-slate-600 pt-2">
+        Contraction Tracker v{APP_VERSION}
+      </p>
     </div>
   );
 };

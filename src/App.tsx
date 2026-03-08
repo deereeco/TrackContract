@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { UpdateProvider } from './contexts/UpdateContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SessionProvider, useSession } from './contexts/SessionContext';
 import { ContractionProvider } from './contexts/ContractionContext';
@@ -135,15 +136,17 @@ const AppContent = () => {
 function App() {
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <SessionProvider>
-          <SyncProvider>
-            <ContractionProvider>
-              <AppContent />
-            </ContractionProvider>
-          </SyncProvider>
-        </SessionProvider>
-      </AuthProvider>
+      <UpdateProvider>
+        <AuthProvider>
+          <SessionProvider>
+            <SyncProvider>
+              <ContractionProvider>
+                <AppContent />
+              </ContractionProvider>
+            </SyncProvider>
+          </SessionProvider>
+        </AuthProvider>
+      </UpdateProvider>
     </ThemeProvider>
   );
 }

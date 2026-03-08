@@ -1,4 +1,5 @@
 import { Clock, List, BarChart3, Settings as SettingsIcon } from 'lucide-react';
+import { useUpdate } from '../../contexts/UpdateContext';
 
 type Tab = 'timer' | 'list' | 'chart' | 'settings';
 
@@ -15,6 +16,8 @@ const tabs = [
 ];
 
 const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
+  const { updateAvailable } = useUpdate();
+
   return (
     <nav className="bg-slate-100 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 md:border-t-0 md:border-b">
       <div className="container mx-auto px-4">
@@ -36,7 +39,12 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
                   }
                 `}
               >
-                <Icon className="w-6 h-6" />
+                <div className="relative">
+                  <Icon className="w-6 h-6" />
+                  {tab.id === 'settings' && updateAvailable && (
+                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full" />
+                  )}
+                </div>
                 <span className="text-sm md:text-base font-medium">{tab.label}</span>
                 {isActive && (
                   <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary rounded-t-full md:rounded-t-none md:rounded-l-full md:left-auto md:right-0 md:top-0 md:bottom-0 md:w-1 md:h-full" />
