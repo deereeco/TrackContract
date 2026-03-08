@@ -110,6 +110,7 @@ export const signInAnonymouslyForViewer = async (): Promise<void> => {
 export const signInWithGooglePopup = async (): Promise<void> => {
   const firebaseAuth = getFirebaseAuth();
   const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
   await signInWithPopup(firebaseAuth, provider);
 };
 
