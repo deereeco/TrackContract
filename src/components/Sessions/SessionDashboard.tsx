@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Play, Archive } from 'lucide-react';
+import { Plus, Play, Archive, LogOut } from 'lucide-react';
 import { useSession } from '../../contexts/SessionContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatDateTime } from '../../utils/dateTime';
 
 const SessionDashboard = () => {
   const { sessions, sessionsLoading, createSession, selectSession, updateSession } = useSession();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const [newName, setNewName] = useState('');
   const [creating, setCreating] = useState(false);
   const [showInput, setShowInput] = useState(false);
@@ -39,11 +39,21 @@ const SessionDashboard = () => {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 px-4 py-8">
       <div className="max-w-lg mx-auto space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Sessions</h1>
-          <p className="text-slate-600 dark:text-slate-400 mt-1">
-            Each session tracks one patient's contractions.
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Sessions</h1>
+            <p className="text-slate-600 dark:text-slate-400 mt-1">
+              Each session tracks one patient's contractions.
+            </p>
+          </div>
+          <button
+            onClick={() => signOut()}
+            title="Sign out"
+            className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors shrink-0 pt-1"
+          >
+            <LogOut className="w-4 h-4" />
+            {user?.displayName ?? user?.email ?? 'Sign out'}
+          </button>
         </div>
 
         {/* New session */}
