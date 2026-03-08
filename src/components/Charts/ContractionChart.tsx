@@ -14,16 +14,32 @@ const LINES = [
 
 type LineKey = typeof LINES[number]['key'];
 
+const UNIT_KEY = 'chartYUnit';
+
 const ContractionChart = () => {
   const { state } = useContractions();
   const { theme } = useTheme();
   const { contractions } = state;
   const [timeRange, setTimeRange] = useState(0);
+  const [yUnit, setYUnit] = useState<'sec' | 'min'>(
+    () => (localStorage.getItem(UNIT_KEY) as 'sec' | 'min') ?? 'sec'
+  );
   const [visible, setVisible] = useState<Record<LineKey, boolean>>({
     duration: true,
     interval: true,
     restTime: true,
   });
+
+  const toggleUnit = () => {
+    setYUnit(prev => {
+      const next = prev === 'sec' ? 'min' : 'sec';
+      localStorage.setItem(UNIT_KEY, next);
+      return next;
+    });
+  };
+
+  const toUnit = (seconds: number) =>
+    yUnit === 'min' ? Math.round(seconds / 60 * 10) / 10 : Math.round(seconds);
 
   const chartData = useMemo(() => {
     const filteredContractions = timeRange > 0
@@ -34,26 +50,27 @@ const ContractionChart = () => {
     const reversed = [...completed].reverse();
 
     return reversed.map((contraction, index) => {
-      let interval = null;
-      let restTime = null;
+      let intervalSec: number | null = null;
+      let restTimeSec: number | null = null;
 
       if (index > 0) {
         const prev = reversed[index - 1];
-        interval = Math.round((contraction.startTime - prev.startTime) / 1000 / 60 * 10) / 10;
+        intervalSec = (contraction.startTime - prev.startTime) / 1000;
         if (prev.endTime) {
-          restTime = Math.round((contraction.startTime - prev.endTime) / 1000 / 60 * 10) / 10;
+          restTimeSec = (contraction.startTime - prev.endTime) / 1000;
         }
       }
 
       return {
         time: formatTime(contraction.startTime),
         timestamp: contraction.startTime,
-        duration: contraction.duration ? Math.round(contraction.duration / 60 * 10) / 10 : null,
-        interval: interval !== null && interval > 0 ? interval : null,
-        restTime: restTime !== null && restTime > 0 ? restTime : null,
+        duration: contraction.duration ? toUnit(contraction.duration) : null,
+        interval: intervalSec !== null && intervalSec > 0 ? toUnit(intervalSec) : null,
+        restTime: restTimeSec !== null && restTimeSec > 0 ? toUnit(restTimeSec) : null,
       };
     });
-  }, [contractions, timeRange]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contractions, timeRange, yUnit]);
 
   const isDark = theme === 'dark';
   const gridColor = isDark ? '#334155' : '#cbd5e1';
@@ -73,7 +90,18 @@ const ContractionChart = () => {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-2xl font-bold">Contraction Patterns</h2>
-        <ChartControls timeRange={timeRange} onTimeRangeChange={setTimeRange} />
+        <div className="flex items-center gap-3">
+          <button
+            onClick={toggleUnit}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors"
+            title="Toggle Y-axis units"
+          >
+            <span className={yUnit === 'sec' ? 'font-bold text-primary' : 'text-slate-500 dark:text-slate-400'}>sec</span>
+            <span className="text-slate-400">/</span>
+            <span className={yUnit === 'min' ? 'font-bold text-primary' : 'text-slate-500 dark:text-slate-400'}>min</span>
+          </button>
+          <ChartControls timeRange={timeRange} onTimeRangeChange={setTimeRange} />
+        </div>
       </div>
 
       {chartData.length === 0 ? (
@@ -112,9 +140,9 @@ const ContractionChart = () => {
             })}
           </div>
 
-          {/* Combined chart — all lines in minutes */}
+          {/* Combined chart */}
           <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-lg">
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-3 italic">All values in minutes</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-3 italic">All values in {yUnit === 'sec' ? 'seconds' : 'minutes'}</p>
             <ResponsiveContainer width="100%" height={350}>
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
@@ -122,11 +150,11 @@ const ContractionChart = () => {
                 <YAxis
                   stroke={axisColor}
                   tick={{ fill: axisColor }}
-                  label={{ value: 'min', angle: -90, position: 'insideLeft', fill: axisColor, offset: 10 }}
+                  label={{ value: yUnit, angle: -90, position: 'insideLeft', fill: axisColor, offset: 10 }}
                 />
                 <Tooltip
                   contentStyle={tooltipStyle}
-                  formatter={(value: number, name: string) => [`${value} min`, name]}
+                  formatter={(value: number, name: string) => [`${value} ${yUnit}`, name]}
                 />
                 <Legend wrapperStyle={{ color: axisColor }} />
                 {visible.duration && (
