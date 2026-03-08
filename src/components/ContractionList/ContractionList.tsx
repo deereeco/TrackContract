@@ -4,6 +4,19 @@ import { useContractions } from '../../contexts/ContractionContext';
 import { useSync } from '../../contexts/SyncContext';
 import ContractionItem from './ContractionItem';
 import ContractionForm from './ContractionForm';
+import { Contraction } from '../../types/contraction';
+import { calculateInterval, calculateRestTime } from '../../utils/calculations';
+import { formatInterval, formatRestTime } from '../../utils/dateTime';
+
+const ConnectorRow = ({ newer, older }: { newer: Contraction; older: Contraction }) => {
+  const intervalSec = calculateInterval(older, newer);
+  const restSec = older.endTime ? calculateRestTime(older, newer) : 0;
+  return (
+    <div className="text-xs text-slate-400 dark:text-slate-500 text-center py-0.5">
+      ↑ {formatInterval(intervalSec)}{restSec > 0 ? `  ·  ${formatRestTime(restSec)}` : ''}
+    </div>
+  );
+};
 
 const ContractionList = () => {
   const {
@@ -101,9 +114,17 @@ const ContractionList = () => {
       )}
 
       <div className="space-y-2">
-        {contractions.map((contraction, index) => (
-          <ContractionItem key={contraction.id} contraction={contraction} index={index} />
-        ))}
+        {contractions.map((contraction, index) => {
+          const olderContraction = contractions[index + 1];
+          return (
+            <div key={contraction.id}>
+              <ContractionItem contraction={contraction} index={index} />
+              {olderContraction && (
+                <ConnectorRow newer={contraction} older={olderContraction} />
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Archive All Section */}
