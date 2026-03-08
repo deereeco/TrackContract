@@ -9,7 +9,6 @@ const ContractionList = () => {
   const {
     state,
     archiveAllContractions,
-    refreshContractions,
     undo,
     redo,
     canUndo,
@@ -63,7 +62,7 @@ const ContractionList = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
+      <div className="space-y-2">
         <h2 className="text-2xl font-bold">All Contractions ({contractions.length})</h2>
         <div className="flex gap-2">
           <button
@@ -84,22 +83,14 @@ const ContractionList = () => {
             <Redo className="w-5 h-5" />
             Redo
           </button>
-          <button
-            onClick={refreshContractions}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-900 dark:text-white rounded-lg transition-colors"
-            title="Refresh data"
-          >
-            <RefreshCw className="w-5 h-5" />
-            Refresh
-          </button>
-          <button
-            onClick={() => setShowForm(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg transition-colors"
-          >
-            <Plus className="w-5 h-5" />
-            Add
-          </button>
         </div>
+        <button
+          onClick={() => setShowForm(true)}
+          className="inline-flex w-full justify-center items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg transition-colors"
+        >
+          <Plus className="w-5 h-5" />
+          Add Entry
+        </button>
       </div>
 
       {syncState.realtimeEnabled && (
