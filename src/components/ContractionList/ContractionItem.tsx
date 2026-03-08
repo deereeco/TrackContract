@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Trash2 } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 import { Contraction } from '../../types/contraction';
 import { useContractions } from '../../contexts/ContractionContext';
 import { formatDateTime, formatDurationReadable } from '../../utils/dateTime';
+import ContractionEditForm from './ContractionEditForm';
 
 interface ContractionItemProps {
   contraction: Contraction;
@@ -11,6 +13,7 @@ interface ContractionItemProps {
 
 const ContractionItem = ({ contraction, index }: ContractionItemProps) => {
   const { deleteContraction } = useContractions();
+  const [showEditForm, setShowEditForm] = useState(false);
 
   const handleDelete = async () => {
     if (window.confirm('Archive this contraction?\n\nIt will be hidden from the list but can be restored from Settings.')) {
@@ -66,6 +69,14 @@ const ContractionItem = ({ contraction, index }: ContractionItemProps) => {
 
         <div className="flex gap-2 ml-4">
           <button
+            onClick={() => setShowEditForm(true)}
+            className="p-2 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
+            aria-label="Edit contraction"
+            title="Edit contraction"
+          >
+            <Pencil className="w-5 h-5" />
+          </button>
+          <button
             onClick={handleDelete}
             className="p-2 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors"
             aria-label="Archive contraction"
@@ -75,6 +86,13 @@ const ContractionItem = ({ contraction, index }: ContractionItemProps) => {
           </button>
         </div>
       </div>
+
+      {showEditForm && (
+        <ContractionEditForm
+          contraction={contraction}
+          onClose={() => setShowEditForm(false)}
+        />
+      )}
     </motion.div>
   );
 };

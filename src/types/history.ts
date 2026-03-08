@@ -10,6 +10,7 @@ export interface HistoryEntry {
   contractionIds?: string[];
   previousState?: Contraction;
   previousStates?: Contraction[];
+  newState?: Contraction;
   description: string;
 }
 

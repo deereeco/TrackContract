@@ -53,7 +53,8 @@ export class HistoryManager {
     contractionId?: string,
     contractionIds?: string[],
     previousState?: Contraction,
-    previousStates?: Contraction[]
+    previousStates?: Contraction[],
+    newState?: Contraction
   ): Promise<void> {
     // Remove any entries after current index (redo stack)
     if (this.state.currentIndex < this.state.entries.length - 1) {
@@ -70,6 +71,7 @@ export class HistoryManager {
       contractionIds,
       previousState,
       previousStates,
+      newState,
     };
 
     // Add to entries

@@ -6,21 +6,31 @@ import { getContractionsInTimeRange } from '../../utils/calculations';
 import { formatTime } from '../../utils/dateTime';
 import ChartControls from './ChartControls';
 
+const LINES = [
+  { key: 'duration', label: 'Duration', color: '#3B82F6' },
+  { key: 'interval', label: 'Interval', color: '#10B981' },
+  { key: 'restTime', label: 'Rest Time', color: '#F59E0B' },
+] as const;
+
+type LineKey = typeof LINES[number]['key'];
+
 const ContractionChart = () => {
   const { state } = useContractions();
   const { theme } = useTheme();
   const { contractions } = state;
-  const [timeRange, setTimeRange] = useState(0); // Default to All
+  const [timeRange, setTimeRange] = useState(0);
+  const [visible, setVisible] = useState<Record<LineKey, boolean>>({
+    duration: true,
+    interval: true,
+    restTime: true,
+  });
 
   const chartData = useMemo(() => {
     const filteredContractions = timeRange > 0
       ? getContractionsInTimeRange(contractions, timeRange)
       : contractions;
 
-    // Only include completed contractions
     const completed = filteredContractions.filter(c => c.endTime && c.duration);
-
-    // Reverse to show chronologically
     const reversed = [...completed].reverse();
 
     return reversed.map((contraction, index) => {
@@ -29,16 +39,16 @@ const ContractionChart = () => {
 
       if (index > 0) {
         const prev = reversed[index - 1];
-        interval = Math.floor((contraction.startTime - prev.startTime) / 1000 / 60); // minutes
+        interval = Math.round((contraction.startTime - prev.startTime) / 1000 / 60 * 10) / 10;
         if (prev.endTime) {
-          restTime = Math.floor((contraction.startTime - prev.endTime) / 1000 / 60); // minutes
+          restTime = Math.round((contraction.startTime - prev.endTime) / 1000 / 60 * 10) / 10;
         }
       }
 
       return {
         time: formatTime(contraction.startTime),
         timestamp: contraction.startTime,
-        duration: contraction.duration,
+        duration: contraction.duration ? Math.round(contraction.duration / 60 * 10) / 10 : null,
         interval: interval !== null && interval > 0 ? interval : null,
         restTime: restTime !== null && restTime > 0 ? restTime : null,
       };
@@ -46,7 +56,6 @@ const ContractionChart = () => {
   }, [contractions, timeRange]);
 
   const isDark = theme === 'dark';
-
   const gridColor = isDark ? '#334155' : '#cbd5e1';
   const axisColor = isDark ? '#94a3b8' : '#64748b';
   const tooltipStyle = {
@@ -56,14 +65,15 @@ const ContractionChart = () => {
     color: isDark ? '#f1f5f9' : '#0f172a',
   };
 
+  const toggle = (key: LineKey) => {
+    setVisible(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
   return (
     <div className="space-y-4">
-      <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-2xl font-bold">Contraction Patterns</h2>
-        <ChartControls
-          timeRange={timeRange}
-          onTimeRangeChange={setTimeRange}
-        />
+        <ChartControls timeRange={timeRange} onTimeRangeChange={setTimeRange} />
       </div>
 
       {chartData.length === 0 ? (
@@ -76,76 +86,85 @@ const ContractionChart = () => {
         </div>
       ) : (
         <>
-      {/* Duration Chart */}
-      <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-lg">
-        <h3 className="text-lg font-semibold">Contraction Duration</h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-3 italic">How long each contraction lasted (seconds)</p>
-        <ResponsiveContainer width="100%" height={250}>
-          <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-            <XAxis dataKey="time" stroke={axisColor} tick={{ fill: axisColor }} />
-            <YAxis stroke={axisColor} tick={{ fill: axisColor }} />
-            <Tooltip contentStyle={tooltipStyle} formatter={(value: any) => [`${value}s`, 'Duration']} />
-            <Legend wrapperStyle={{ color: axisColor }} />
-            <Line
-              type="monotone"
-              dataKey="duration"
-              stroke="#3B82F6"
-              strokeWidth={2}
-              dot={{ fill: '#3B82F6', r: 4 }}
-              name="Duration (seconds)"
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
+          {/* Line toggles */}
+          <div className="flex flex-wrap gap-3">
+            {LINES.map(({ key, label, color }) => {
+              const on = visible[key];
+              return (
+                <button
+                  key={key}
+                  onClick={() => toggle(key)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full border-2 text-sm font-semibold transition-all ${
+                    on ? 'opacity-100' : 'opacity-40'
+                  }`}
+                  style={{ borderColor: color, color: on ? color : axisColor }}
+                >
+                  <span
+                    className="inline-block w-4 h-4 rounded-sm border-2 flex-shrink-0"
+                    style={{
+                      borderColor: color,
+                      backgroundColor: on ? color : 'transparent',
+                    }}
+                  />
+                  {label}
+                </button>
+              );
+            })}
+          </div>
 
-      {/* Interval Chart */}
-      <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-lg">
-        <h3 className="text-lg font-semibold">Time Between Contractions</h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-3 italic">From start of one contraction to start of the next</p>
-        <ResponsiveContainer width="100%" height={250}>
-          <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-            <XAxis dataKey="time" stroke={axisColor} tick={{ fill: axisColor }} />
-            <YAxis stroke={axisColor} tick={{ fill: axisColor }} />
-            <Tooltip contentStyle={tooltipStyle} formatter={(value: any) => [`${value}m`, 'Interval']} />
-            <Legend wrapperStyle={{ color: axisColor }} />
-            <Line
-              type="monotone"
-              dataKey="interval"
-              stroke="#10B981"
-              strokeWidth={2}
-              dot={{ fill: '#10B981', r: 4 }}
-              name="Interval (minutes)"
-              connectNulls
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* Rest Time Chart */}
-      <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-lg">
-        <h3 className="text-lg font-semibold">Rest Time</h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-3 italic">Actual break between contractions (end of one to start of next)</p>
-        <ResponsiveContainer width="100%" height={250}>
-          <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-            <XAxis dataKey="time" stroke={axisColor} tick={{ fill: axisColor }} />
-            <YAxis stroke={axisColor} tick={{ fill: axisColor }} />
-            <Tooltip contentStyle={tooltipStyle} formatter={(value: any) => [`${value}m`, 'Rest']} />
-            <Legend wrapperStyle={{ color: axisColor }} />
-            <Line
-              type="monotone"
-              dataKey="restTime"
-              stroke="#F59E0B"
-              strokeWidth={2}
-              dot={{ fill: '#F59E0B', r: 4 }}
-              name="Rest Time (minutes)"
-              connectNulls
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
+          {/* Combined chart — all lines in minutes */}
+          <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-lg">
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-3 italic">All values in minutes</p>
+            <ResponsiveContainer width="100%" height={350}>
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+                <XAxis dataKey="time" stroke={axisColor} tick={{ fill: axisColor }} />
+                <YAxis
+                  stroke={axisColor}
+                  tick={{ fill: axisColor }}
+                  label={{ value: 'min', angle: -90, position: 'insideLeft', fill: axisColor, offset: 10 }}
+                />
+                <Tooltip
+                  contentStyle={tooltipStyle}
+                  formatter={(value: number, name: string) => [`${value} min`, name]}
+                />
+                <Legend wrapperStyle={{ color: axisColor }} />
+                {visible.duration && (
+                  <Line
+                    type="monotone"
+                    dataKey="duration"
+                    stroke="#3B82F6"
+                    strokeWidth={2}
+                    dot={{ fill: '#3B82F6', r: 4 }}
+                    name="Duration"
+                    connectNulls
+                  />
+                )}
+                {visible.interval && (
+                  <Line
+                    type="monotone"
+                    dataKey="interval"
+                    stroke="#10B981"
+                    strokeWidth={2}
+                    dot={{ fill: '#10B981', r: 4 }}
+                    name="Interval"
+                    connectNulls
+                  />
+                )}
+                {visible.restTime && (
+                  <Line
+                    type="monotone"
+                    dataKey="restTime"
+                    stroke="#F59E0B"
+                    strokeWidth={2}
+                    dot={{ fill: '#F59E0B', r: 4 }}
+                    name="Rest Time"
+                    connectNulls
+                  />
+                )}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         </>
       )}
     </div>

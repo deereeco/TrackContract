@@ -243,12 +243,18 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     dispatch({ type: 'UPDATE_CONTRACTION', payload: { id, updates } });
     try {
       await firestoreClient.updateContraction(id, updates, sessionId);
+      if (contraction) {
+        const timeStr = formatTime(contraction.startTime);
+        const newState = { ...contraction, ...updates };
+        await historyManager.addEntry('update', `Edited contraction at ${timeStr}`, id, undefined, contraction, undefined, newState);
+        refreshHistoryState();
+      }
     } catch (error) {
       console.error('Failed to update contraction:', error);
       if (contraction) dispatch({ type: 'UPDATE_CONTRACTION', payload: { id, updates: contraction } });
       throw error;
     }
-  }, [state.contractions, sessionId]);
+  }, [state.contractions, sessionId, refreshHistoryState]);
 
   const deleteContraction = useCallback(async (id: string) => {
     if (!sessionId) return;
@@ -327,6 +333,12 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
             }
           }
           break;
+        case 'update':
+          if (entry.contractionId && entry.previousState) {
+            dispatch({ type: 'UPDATE_CONTRACTION', payload: { id: entry.contractionId, updates: entry.previousState } });
+            await firestoreClient.updateContraction(entry.contractionId, entry.previousState, sessionId);
+          }
+          break;
       }
       await historyManager.moveUndoPointer();
       refreshHistoryState();
@@ -362,6 +374,12 @@ export const ContractionProvider: React.FC<{ children: React.ReactNode }> = ({ c
               dispatch({ type: 'DELETE_CONTRACTION', payload: id });
               await firestoreClient.deleteContraction(id, sessionId);
             }
+          }
+          break;
+        case 'update':
+          if (entry.contractionId && entry.newState) {
+            dispatch({ type: 'UPDATE_CONTRACTION', payload: { id: entry.contractionId, updates: entry.newState } });
+            await firestoreClient.updateContraction(entry.contractionId, entry.newState, sessionId);
           }
           break;
       }
