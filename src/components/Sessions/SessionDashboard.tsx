@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Play, Archive, LogOut } from 'lucide-react';
+import { Plus, Play, Archive, LogOut, Moon, Sun } from 'lucide-react';
 import { useSession } from '../../contexts/SessionContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import { formatDateTime } from '../../utils/dateTime';
 
 const SessionDashboard = () => {
   const { sessions, sessionsLoading, createSession, selectSession, updateSession } = useSession();
   const { user, signOut } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [newName, setNewName] = useState('');
   const [creating, setCreating] = useState(false);
   const [showInput, setShowInput] = useState(false);
@@ -38,6 +40,13 @@ const SessionDashboard = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 px-4 py-8">
+      <button
+        onClick={toggleTheme}
+        className="fixed top-4 right-4 p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+        aria-label="Toggle theme"
+      >
+        {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+      </button>
       <div className="max-w-lg mx-auto space-y-6">
         <div className="flex items-start justify-between gap-4">
           <div>

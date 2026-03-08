@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { Moon, Sun } from 'lucide-react';
 import { useSession } from '../../contexts/SessionContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import { resolveShareToken } from '../../services/firebase/sessionClient';
 import { setViewerSessionId } from '../../services/storage/localStorage';
 
@@ -11,6 +13,7 @@ interface ViewerLandingProps {
 const ViewerLanding = ({ onBack }: ViewerLandingProps) => {
   const { selectSession } = useSession();
   const { signInAnonymously, signOut, user } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -57,6 +60,13 @@ const ViewerLanding = ({ onBack }: ViewerLandingProps) => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 px-4">
+      <button
+        onClick={toggleTheme}
+        className="fixed top-4 right-4 p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+        aria-label="Toggle theme"
+      >
+        {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+      </button>
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Contraction Tracker</h1>
