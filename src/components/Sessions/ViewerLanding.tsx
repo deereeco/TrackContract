@@ -6,7 +6,7 @@ import { setViewerSessionId } from '../../services/storage/localStorage';
 
 const ViewerLanding = () => {
   const { selectSession } = useSession();
-  const { signInAnonymously, user } = useAuth();
+  const { signInAnonymously, signOut, user } = useAuth();
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -88,6 +88,15 @@ const ViewerLanding = () => {
               {loading ? 'Joining...' : 'Join Session'}
             </button>
           </form>
+
+          <div className="pt-2 border-t border-slate-200 dark:border-slate-700 text-center">
+            <button
+              onClick={() => signOut()}
+              className="text-sm text-primary hover:underline"
+            >
+              Sign in with your own Google account
+            </button>
+          </div>
         </div>
       </div>
     </div>
