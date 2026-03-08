@@ -56,16 +56,6 @@ const ContractionChart = () => {
     color: isDark ? '#f1f5f9' : '#0f172a',
   };
 
-  if (chartData.length === 0) {
-    return (
-      <div className="text-center p-8">
-        <p className="text-slate-500 dark:text-slate-400">
-          Not enough data to display chart. Record at least 2 contractions.
-        </p>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
       <div className="space-y-4">
@@ -76,6 +66,16 @@ const ContractionChart = () => {
         />
       </div>
 
+      {chartData.length === 0 ? (
+        <div className="text-center p-8">
+          <p className="text-slate-500 dark:text-slate-400">
+            {contractions.length === 0
+              ? 'Record at least 2 contractions to view the chart.'
+              : 'No contractions found in this time range. Try selecting a wider range.'}
+          </p>
+        </div>
+      ) : (
+        <>
       {/* Duration Chart */}
       <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-lg">
         <h3 className="text-lg font-semibold">Contraction Duration</h3>
@@ -146,6 +146,8 @@ const ContractionChart = () => {
           </LineChart>
         </ResponsiveContainer>
       </div>
+        </>
+      )}
     </div>
   );
 };
