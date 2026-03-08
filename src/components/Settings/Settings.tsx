@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircle, Share2, Copy, Download, RotateCcw, Trash2, LogOut, Pencil, RefreshCw } from 'lucide-react';
+import { CheckCircle, Share2, Copy, Download, Upload, RotateCcw, Trash2, LogOut, Pencil, RefreshCw } from 'lucide-react';
 import { useUpdate } from '../../contexts/UpdateContext';
 import { APP_VERSION } from '../../version';
-import { getAllContractions, permanentlyDeleteContraction } from '../../services/firebase/firestoreClient';
+import { getAllContractions, permanentlyDeleteContraction, batchImportContractions } from '../../services/firebase/firestoreClient';
 import { useContractions } from '../../contexts/ContractionContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
@@ -24,6 +24,7 @@ const Settings = () => {
   const [loadingArchived, setLoadingArchived] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
+  const [importing, setImporting] = useState(false);
 
   const handleGenerateLink = () => {
     if (!activeSession) return;
@@ -77,6 +78,51 @@ const Settings = () => {
     } catch (error) {
       console.error('Export failed:', error);
       alert('Failed to export data. Please try again.');
+    }
+  };
+
+  const handleImportData = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeSession) return;
+    e.target.value = '';
+
+    setImporting(true);
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+
+      if (!Array.isArray(data?.contractions) || data.contractions.length === 0) {
+        alert('Invalid file: no contractions array found.');
+        return;
+      }
+
+      const now = Date.now();
+      const contractions = data.contractions.map((c: any) => ({
+        id: c.id,
+        startTime: new Date(c.startTime).getTime(),
+        endTime: c.endTime ? new Date(c.endTime).getTime() : null,
+        duration: c.duration ?? null,
+        intensity: c.intensity,
+        notes: c.notes,
+        createdAt: c.createdAt ? new Date(c.createdAt).getTime() : now,
+        updatedAt: now,
+        archived: false,
+        syncStatus: 'synced' as const,
+      }));
+
+      const valid = contractions.filter((c: any) => c.id && !isNaN(c.startTime));
+      const invalid = contractions.length - valid.length;
+
+      const { imported, skipped } = await batchImportContractions(valid, activeSession.id);
+      const parts = [`Imported ${imported} contraction${imported !== 1 ? 's' : ''}.`];
+      if (skipped > 0) parts.push(`${skipped} duplicate${skipped !== 1 ? 's' : ''} skipped.`);
+      if (invalid > 0) parts.push(`${invalid} invalid record${invalid !== 1 ? 's' : ''} skipped.`);
+      alert(parts.join(' '));
+    } catch (err) {
+      console.error('Import failed:', err);
+      alert('Failed to import data. Make sure the file is a valid export JSON.');
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -199,19 +245,37 @@ const Settings = () => {
             <span className="text-sm font-medium">Real-time sync active</span>
           </div>
 
-          {/* Export */}
+          {/* Export & Import */}
           {!isAnonymous && (
-            <div>
-              <button
-                onClick={handleExportData}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-              >
-                <Download className="w-5 h-5" />
-                Export Data to JSON
-              </button>
-              <p className="text-xs text-slate-600 dark:text-slate-400 mt-2">
-                Download all contraction data for this session as a JSON file.
-              </p>
+            <div className="space-y-3">
+              <div>
+                <button
+                  onClick={handleExportData}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                >
+                  <Download className="w-5 h-5" />
+                  Export Data to JSON
+                </button>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-2">
+                  Download all contraction data for this session as a JSON file.
+                </p>
+              </div>
+              <div>
+                <label className="flex items-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded-lg transition-colors cursor-pointer w-fit">
+                  <Upload className="w-5 h-5" />
+                  {importing ? 'Importing...' : 'Import from JSON'}
+                  <input
+                    type="file"
+                    accept=".json"
+                    className="hidden"
+                    onChange={handleImportData}
+                    disabled={importing}
+                  />
+                </label>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-2">
+                  Restore contraction data from a previously exported JSON file.
+                </p>
+              </div>
             </div>
           )}
         </div>

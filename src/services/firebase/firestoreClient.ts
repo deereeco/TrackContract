@@ -244,6 +244,36 @@ export const batchDelete = async (ids: string[], sessionId: string): Promise<voi
   }
 };
 
+export const batchImportContractions = async (
+  contractions: Contraction[],
+  sessionId: string
+): Promise<{ imported: number; skipped: number }> => {
+  try {
+    const db = getFirebaseDb();
+    const contractionsRef = getContractionsCollection(sessionId);
+
+    const existing = await getAllContractions(sessionId, true);
+    const existingIds = new Set(existing.map(c => c.id));
+
+    const toImport = contractions.filter(c => !existingIds.has(c.id));
+    const skipped = contractions.length - toImport.length;
+
+    const BATCH_SIZE = 500;
+    for (let i = 0; i < toImport.length; i += BATCH_SIZE) {
+      const batch = writeBatch(db);
+      toImport.slice(i, i + BATCH_SIZE).forEach(c => {
+        batch.set(doc(contractionsRef, c.id), contractionToDocument(c));
+      });
+      await batch.commit();
+    }
+
+    return { imported: toImport.length, skipped };
+  } catch (error) {
+    console.error('Error batch importing contractions to Firestore:', error);
+    throw error;
+  }
+};
+
 // ─── Legacy operations (for old #userId= share links) ────────────────────────
 
 export const legacySubscribeToContractions = (
