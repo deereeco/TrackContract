@@ -9,9 +9,11 @@ interface ContractionFormProps {
 
 const ContractionForm = ({ onClose }: ContractionFormProps) => {
   const { addManualContraction } = useContractions();
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
   const [formData, setFormData] = useState({
-    date: new Date().toISOString().split('T')[0],
-    startTime: new Date().toTimeString().slice(0, 5),
+    date: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
+    startTime: `${pad(now.getHours())}:${pad(now.getMinutes())}`,
     duration: '',
     intensity: '',
     notes: '',

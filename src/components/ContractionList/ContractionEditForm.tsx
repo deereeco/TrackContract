@@ -13,9 +13,10 @@ const ContractionEditForm = ({ contraction, onClose }: ContractionEditFormProps)
   const { updateContraction } = useContractions();
 
   const startDate = new Date(contraction.startTime);
+  const pad = (n: number) => String(n).padStart(2, '0');
   const [formData, setFormData] = useState({
-    date: startDate.toISOString().split('T')[0],
-    startTime: startDate.toTimeString().slice(0, 5),
+    date: `${startDate.getFullYear()}-${pad(startDate.getMonth() + 1)}-${pad(startDate.getDate())}`,
+    startTime: `${pad(startDate.getHours())}:${pad(startDate.getMinutes())}`,
     duration: contraction.duration != null ? String(contraction.duration) : '',
     intensity: contraction.intensity != null ? String(contraction.intensity) : '',
     notes: contraction.notes ?? '',
