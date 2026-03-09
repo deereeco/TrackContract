@@ -86,6 +86,18 @@ export const getContractionsInTimeRange = (
 };
 
 /**
+ * Get contractions within the first X hours of the session (from the earliest contraction)
+ */
+export const getContractionsFromSessionStart = (
+  contractions: Contraction[],
+  hours: number
+): Contraction[] => {
+  if (contractions.length === 0) return [];
+  const earliest = Math.min(...contractions.map(c => c.startTime));
+  return contractions.filter(c => c.startTime <= earliest + hours * 60 * 60 * 1000);
+};
+
+/**
  * Check if labor pattern indicates active labor (useful for alerts)
  * Active labor typically: contractions 3-5 minutes apart, lasting 45-60 seconds
  */
