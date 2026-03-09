@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircle, Share2, Copy, Download, Upload, RotateCcw, Trash2, LogOut, Pencil, RefreshCw } from 'lucide-react';
+import { CheckCircle, Share2, Copy, Download, Upload, RotateCcw, Trash2, LogOut, Pencil, RefreshCw, ChevronDown, ChevronRight, Clipboard, ClipboardCheck } from 'lucide-react';
 import { useUpdate } from '../../contexts/UpdateContext';
 import { APP_VERSION } from '../../version';
 import { getAllContractions, permanentlyDeleteContraction, batchImportContractions } from '../../services/firebase/firestoreClient';
@@ -10,6 +10,7 @@ import { useSession } from '../../contexts/SessionContext';
 import { getShareLink } from '../../services/firebase/sessionClient';
 import type { Contraction } from '../../types/contraction';
 import { formatDateTime, formatDurationReadable } from '../../utils/dateTime';
+import { parseCSV, csvToContractions, contractionsToCSV, contractionsToTSV, CSV_TEMPLATE } from '../../utils/csvUtils';
 
 const Settings = () => {
   const { updateAvailable, applyUpdate } = useUpdate();
@@ -25,6 +26,9 @@ const Settings = () => {
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
   const [importing, setImporting] = useState(false);
+  const [showFormatGuide, setShowFormatGuide] = useState(false);
+  const [showSpreadsheetExport, setShowSpreadsheetExport] = useState(false);
+  const [copySuccess, setCopySuccess] = useState<'csv' | 'tsv' | null>(null);
 
   const handleGenerateLink = () => {
     if (!activeSession) return;
@@ -81,6 +85,47 @@ const Settings = () => {
     }
   };
 
+  const handleExportSpreadsheet = async (format: 'csv' | 'tsv', action: 'save' | 'copy') => {
+    if (!activeSession) return;
+    try {
+      const contractions = await getAllContractions(activeSession.id);
+      if (contractions.length === 0) { alert('No contractions to export.'); return; }
+      const content = format === 'csv' ? contractionsToCSV(contractions) : contractionsToTSV(contractions);
+      if (action === 'copy') {
+        await navigator.clipboard.writeText(content);
+        setCopySuccess(format);
+        setTimeout(() => setCopySuccess(null), 2000);
+      } else {
+        const ext = format;
+        const mime = format === 'csv' ? 'text/csv' : 'text/tab-separated-values';
+        const blob = new Blob([content], { type: mime });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `contractions-${activeSession.name}-${new Date().toISOString().split('T')[0]}.${ext}`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
+    } catch (err) {
+      console.error('Spreadsheet export failed:', err);
+      alert('Failed to export data. Please try again.');
+    }
+  };
+
+  const handleDownloadTemplate = () => {
+    const blob = new Blob([CSV_TEMPLATE], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'contractions-template.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const handleImportData = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !activeSession) return;
@@ -89,38 +134,52 @@ const Settings = () => {
     setImporting(true);
     try {
       const text = await file.text();
-      const data = JSON.parse(text);
-
-      if (!Array.isArray(data?.contractions) || data.contractions.length === 0) {
-        alert('Invalid file: no contractions array found.');
-        return;
-      }
-
+      const ext = file.name.split('.').pop()?.toLowerCase();
       const now = Date.now();
-      const contractions = data.contractions.map((c: any) => ({
-        id: c.id,
-        startTime: new Date(c.startTime).getTime(),
-        endTime: c.endTime ? new Date(c.endTime).getTime() : null,
-        duration: c.duration ?? null,
-        intensity: c.intensity,
-        notes: c.notes,
-        createdAt: c.createdAt ? new Date(c.createdAt).getTime() : now,
-        updatedAt: now,
-        archived: false,
-        syncStatus: 'synced' as const,
-      }));
 
-      const valid = contractions.filter((c: any) => c.id && !isNaN(c.startTime));
-      const invalid = contractions.length - valid.length;
-
-      const { imported, skipped } = await batchImportContractions(valid, activeSession.id);
-      const parts = [`Imported ${imported} contraction${imported !== 1 ? 's' : ''}.`];
-      if (skipped > 0) parts.push(`${skipped} duplicate${skipped !== 1 ? 's' : ''} skipped.`);
-      if (invalid > 0) parts.push(`${invalid} invalid record${invalid !== 1 ? 's' : ''} skipped.`);
-      alert(parts.join(' '));
+      if (ext === 'json') {
+        const data = JSON.parse(text);
+        if (!Array.isArray(data?.contractions) || data.contractions.length === 0) {
+          alert('Invalid file: no contractions array found.');
+          return;
+        }
+        const contractions = data.contractions.map((c: any) => ({
+          id: c.id,
+          startTime: new Date(c.startTime).getTime(),
+          endTime: c.endTime ? new Date(c.endTime).getTime() : null,
+          duration: c.duration ?? null,
+          intensity: c.intensity,
+          notes: c.notes,
+          createdAt: c.createdAt ? new Date(c.createdAt).getTime() : now,
+          updatedAt: now,
+          archived: false,
+          syncStatus: 'synced' as const,
+        }));
+        const valid = contractions.filter((c: any) => c.id && !isNaN(c.startTime));
+        const invalid = contractions.length - valid.length;
+        const { imported, skipped } = await batchImportContractions(valid, activeSession.id);
+        const parts = [`Imported ${imported} contraction${imported !== 1 ? 's' : ''}.`];
+        if (skipped > 0) parts.push(`${skipped} duplicate${skipped !== 1 ? 's' : ''} skipped.`);
+        if (invalid > 0) parts.push(`${invalid} invalid record${invalid !== 1 ? 's' : ''} skipped.`);
+        alert(parts.join(' '));
+      } else {
+        // CSV / TSV / TXT
+        const parsed = parseCSV(text);
+        if (parsed.headers.length === 0) { alert('File appears to be empty.'); return; }
+        const { valid, invalid } = csvToContractions(parsed, now);
+        if (valid.length === 0 && invalid > 0) {
+          alert('No valid rows found. Make sure your file has a startTime column with valid dates.');
+          return;
+        }
+        const { imported, skipped } = await batchImportContractions(valid, activeSession.id);
+        const parts = [`Imported ${imported} contraction${imported !== 1 ? 's' : ''}.`];
+        if (skipped > 0) parts.push(`${skipped} duplicate${skipped !== 1 ? 's' : ''} skipped.`);
+        if (invalid > 0) parts.push(`${invalid} invalid row${invalid !== 1 ? 's' : ''} skipped (missing startTime).`);
+        alert(parts.join(' '));
+      }
     } catch (err) {
       console.error('Import failed:', err);
-      alert('Failed to import data. Make sure the file is a valid export JSON.');
+      alert('Failed to import data. Make sure the file is a valid JSON, CSV, or TSV export.');
     } finally {
       setImporting(false);
     }
@@ -247,7 +306,8 @@ const Settings = () => {
 
           {/* Export & Import */}
           {!isAnonymous && (
-            <div className="space-y-3">
+            <div className="space-y-4">
+              {/* JSON export */}
               <div>
                 <button
                   onClick={handleExportData}
@@ -260,21 +320,103 @@ const Settings = () => {
                   Download all contraction data for this session as a JSON file.
                 </p>
               </div>
+
+              {/* Spreadsheet export */}
+              <div>
+                <button
+                  onClick={() => setShowSpreadsheetExport(v => !v)}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                >
+                  <Download className="w-5 h-5" />
+                  Export as Spreadsheet (CSV / TSV)
+                  {showSpreadsheetExport ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                </button>
+                {showSpreadsheetExport && (
+                  <div className="mt-2 ml-1 flex flex-wrap gap-2">
+                    <button
+                      onClick={() => handleExportSpreadsheet('csv', 'save')}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-600 hover:bg-slate-700 text-white text-sm rounded-lg transition-colors"
+                    >
+                      <Download className="w-4 h-4" /> Save CSV
+                    </button>
+                    <button
+                      onClick={() => handleExportSpreadsheet('csv', 'copy')}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-600 hover:bg-slate-700 text-white text-sm rounded-lg transition-colors"
+                    >
+                      {copySuccess === 'csv' ? <ClipboardCheck className="w-4 h-4" /> : <Clipboard className="w-4 h-4" />}
+                      {copySuccess === 'csv' ? 'Copied!' : 'Copy CSV'}
+                    </button>
+                    <button
+                      onClick={() => handleExportSpreadsheet('tsv', 'save')}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-600 hover:bg-slate-700 text-white text-sm rounded-lg transition-colors"
+                    >
+                      <Download className="w-4 h-4" /> Save TSV
+                    </button>
+                    <button
+                      onClick={() => handleExportSpreadsheet('tsv', 'copy')}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-600 hover:bg-slate-700 text-white text-sm rounded-lg transition-colors"
+                    >
+                      {copySuccess === 'tsv' ? <ClipboardCheck className="w-4 h-4" /> : <Clipboard className="w-4 h-4" />}
+                      {copySuccess === 'tsv' ? 'Copied!' : 'Copy TSV'}
+                    </button>
+                  </div>
+                )}
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-2">
+                  Export data in a format you can open in Excel, Google Sheets, etc.
+                </p>
+              </div>
+
+              {/* Import */}
               <div>
                 <label className="flex items-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded-lg transition-colors cursor-pointer w-fit">
                   <Upload className="w-5 h-5" />
-                  {importing ? 'Importing...' : 'Import from JSON'}
+                  {importing ? 'Importing...' : 'Import Data'}
                   <input
                     type="file"
-                    accept=".json"
+                    accept=".json,.csv,.tsv,.txt"
                     className="hidden"
                     onChange={handleImportData}
                     disabled={importing}
                   />
                 </label>
                 <p className="text-xs text-slate-600 dark:text-slate-400 mt-2">
-                  Restore contraction data from a previously exported JSON file.
+                  Import contractions from a JSON, CSV, or TSV file.
                 </p>
+
+                {/* Format guide toggle */}
+                <button
+                  onClick={() => setShowFormatGuide(v => !v)}
+                  className="mt-2 flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  {showFormatGuide ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                  Show expected CSV/TSV format
+                </button>
+
+                {showFormatGuide && (
+                  <div className="mt-2 p-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-xs space-y-2">
+                    <p className="font-medium">Expected columns (first row must be a header):</p>
+                    <p className="text-slate-600 dark:text-slate-400">
+                      <span className="font-mono font-semibold">startTime</span> (required) &nbsp;·&nbsp;
+                      <span className="font-mono">endTime</span> &nbsp;·&nbsp;
+                      <span className="font-mono">duration</span> (seconds) &nbsp;·&nbsp;
+                      <span className="font-mono">intensity</span> (1–10) &nbsp;·&nbsp;
+                      <span className="font-mono">notes</span>
+                    </p>
+                    <p className="text-slate-600 dark:text-slate-400">
+                      Dates can be ISO 8601 or <span className="font-mono">YYYY-MM-DD HH:MM:SS</span>. Column order doesn't matter.
+                      TSV files are auto-detected.
+                    </p>
+                    <pre className="bg-slate-100 dark:bg-slate-800 p-2 rounded text-xs overflow-x-auto whitespace-pre">{`startTime,endTime,duration,intensity,notes
+2024-01-15 10:30:00,2024-01-15 10:31:15,75,7,strong
+2024-01-15 10:45:00,,,5,mild pressure`}</pre>
+                    <button
+                      onClick={handleDownloadTemplate}
+                      className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      <Download className="w-3 h-3" /> Download CSV template
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}
