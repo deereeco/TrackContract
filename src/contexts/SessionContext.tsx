@@ -14,6 +14,7 @@ import {
   clearActiveSessionId,
   getViewerSessionId,
   setViewerSessionId,
+  clearViewerSessionId,
 } from '../services/storage/localStorage';
 
 interface SessionContextType {
@@ -57,16 +58,23 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (!user) return;
 
     const restoreSession = async () => {
-      // Midwife: restore last active session
+      // Midwife: restore last active session (owned), then fall back to shared session
       if (!isAnonymous) {
         const storedId = getActiveSessionId();
         if (storedId && !activeSession) {
           const session = await getSession(storedId);
           if (session && session.ownerId === user.uid) {
             setActiveSession(session);
+            return;
           } else {
             clearActiveSessionId();
           }
+        }
+        // Fallback: shared session accessed by Google user
+        const viewerSessionId = getViewerSessionId();
+        if (viewerSessionId && !activeSession) {
+          const session = await getSession(viewerSessionId);
+          if (session) setActiveSession(session);
         }
         return;
       }
@@ -88,12 +96,12 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const session = await getSession(id);
     if (!session) return;
     setActiveSession(session);
-    if (isAnonymous) {
+    if (isAnonymous || (user && session.ownerId !== user.uid)) {
       setViewerSessionId(id);
     } else {
       setActiveSessionId(id);
     }
-  }, [isAnonymous]);
+  }, [isAnonymous, user]);
 
   const createSession = useCallback(async (name: string): Promise<string> => {
     if (!user || isAnonymous) throw new Error('Must be signed in to create a session');
@@ -124,6 +132,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const clearSession = useCallback(() => {
     setActiveSession(null);
     clearActiveSessionId();
+    clearViewerSessionId();
   }, []);
 
   const isOwner = !!(user && activeSession && !user.isAnonymous && user.uid === activeSession.ownerId);

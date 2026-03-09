@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Play, Archive, LogOut, Moon, Sun } from 'lucide-react';
+import { Plus, Play, Archive, LogOut, Moon, Sun, Share2 } from 'lucide-react';
 import { useSession } from '../../contexts/SessionContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { formatDateTime } from '../../utils/dateTime';
+import { getSavedSessions } from '../../services/firebase/sessionClient';
+import { Session } from '../../types/session';
 
 const SessionDashboard = () => {
   const { sessions, sessionsLoading, createSession, selectSession, updateSession } = useSession();
@@ -13,6 +15,12 @@ const SessionDashboard = () => {
   const [newName, setNewName] = useState('');
   const [creating, setCreating] = useState(false);
   const [showInput, setShowInput] = useState(false);
+  const [savedSessions, setSavedSessions] = useState<Session[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    getSavedSessions(user.uid).then(setSavedSessions).catch(console.error);
+  }, [user]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -145,6 +153,38 @@ const SessionDashboard = () => {
                 No active sessions. Create one to get started.
               </p>
             )}
+          </div>
+        )}
+
+        {/* Shared with me */}
+        {savedSessions.length > 0 && (
+          <div className="space-y-2">
+            <h2 className="text-sm font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+              <Share2 className="w-3.5 h-3.5" />
+              Shared with me
+            </h2>
+            {savedSessions.map(session => (
+              <div
+                key={session.id}
+                className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 flex items-center justify-between gap-4"
+              >
+                <div className="min-w-0">
+                  <div className="font-semibold text-slate-900 dark:text-slate-100 truncate">
+                    {session.name}
+                  </div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">
+                    Shared · {formatDateTime(session.createdAt)}
+                  </div>
+                </div>
+                <button
+                  onClick={() => selectSession(session.id)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary-dark text-white text-sm rounded-lg transition-colors shrink-0"
+                >
+                  <Play className="w-3.5 h-3.5" />
+                  View
+                </button>
+              </div>
+            ))}
           </div>
         )}
 

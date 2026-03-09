@@ -2,6 +2,11 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // User profile doc (stores savedSessionIds for shared sessions)
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
     // Legacy paths - existing data
     match /users/{userId}/contractions/{contractionId} {
       allow read, write: if request.auth != null;

@@ -2,6 +2,7 @@ import {
   collection,
   doc,
   addDoc,
+  setDoc,
   updateDoc,
   deleteDoc,
   getDocs,
@@ -10,12 +11,14 @@ import {
   where,
   onSnapshot,
   orderBy,
+  arrayUnion,
   Unsubscribe,
 } from 'firebase/firestore';
 import { getFirebaseDb } from '../../config/firebase';
 import { Session } from '../../types/session';
 
 const sessionsCollection = () => collection(getFirebaseDb(), 'sessions');
+const usersCollection = () => collection(getFirebaseDb(), 'users');
 
 const docToSession = (id: string, data: any): Session => ({
   id,
@@ -77,4 +80,18 @@ export const resolveShareToken = async (token: string): Promise<string | null> =
 export const getShareLink = (shareToken: string): string => {
   const base = window.location.origin + window.location.pathname;
   return `${base}#token=${shareToken}`;
+};
+
+export const saveSharedSession = async (userId: string, sessionId: string): Promise<void> => {
+  await setDoc(doc(usersCollection(), userId), {
+    savedSessionIds: arrayUnion(sessionId),
+  }, { merge: true });
+};
+
+export const getSavedSessions = async (userId: string): Promise<Session[]> => {
+  const userSnap = await getDoc(doc(usersCollection(), userId));
+  if (!userSnap.exists()) return [];
+  const ids: string[] = userSnap.data().savedSessionIds ?? [];
+  const sessions = await Promise.all(ids.map(id => getSession(id)));
+  return sessions.filter((s): s is Session => s !== null);
 };
